@@ -4,9 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "PathRealisation.generated.h"
 
-struct FGeneratedBeatValues;
+#include "RhythmGenerationComponent.h"
+
+
+#include "PathRealisation.generated.h"
 
 UENUM(BlueprintType)
 enum class EPathSectionType : uint8
@@ -53,8 +55,11 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	TArray<FPathSection> GeneratePathFromRhythmGroup(TArray<FGeneratedBeatValues> RhythmGroup, FVector Origin, float RhythmGroupDuration);
+	TArray<FPathSection> GeneratePathFromRhythmGroup(TArray<FGeneratedBeatValues> RhythmGroup, FVector Origin, float RhythmGroupDuration, FVector StartingDirection);
 
-	void ExploreCurrentAction(TArray<FGeneratedBeatValues> &ValuesToVisit, float actionExploreStart, 
-		FGeneratedBeatValues actionBeingExplored, bool &isMoving);
+	void ExploreCurrentAction(TArray<FGeneratedBeatValues> &ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool &isMoving, FVector & CurrentDirection, FVector & CurrentPosition);
+
+	// Physics Calculations
+	FVector GetPositionFromFlatMoving(FVector StartPosition, float CurrentSpeed, float Duration, FVector Direction);
+
 };

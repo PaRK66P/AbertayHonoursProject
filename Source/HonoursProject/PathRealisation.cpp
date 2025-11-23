@@ -3,6 +3,9 @@
 
 #include "PathRealisation.h"
 
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+
 #include "RhythmGenerationComponent.h"
 
 // Sets default values for this component's properties
@@ -34,7 +37,7 @@ void UPathRealisation::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	// ...
 }
 
-TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGeneratedBeatValues> RhythmGroup, FVector Origin, float RhythmGroupDuration)
+TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGeneratedBeatValues> RhythmGroup, FVector Origin, float RhythmGroupDuration, FVector StartingDirection)
 {
 	CurrentPath.Empty();
 
@@ -46,6 +49,9 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 	bool isMoving = false;
 
 	float lowestBeatStartTime;
+
+	FVector currentPosition = Origin;
+	FVector currentDirection = StartingDirection;
 
 	while (!isPathGenerated) {
 		lowestBeatStartTime = ValuesToVisit[0].StartTime;
@@ -59,7 +65,7 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 
 		ValuesToVisit.Remove(currentBeat);
 
-		ExploreCurrentAction(ValuesToVisit, lowestBeatStartTime, currentBeat, isMoving);
+		ExploreCurrentAction(ValuesToVisit, lowestBeatStartTime, currentBeat, isMoving, currentDirection, currentPosition);
 
 		if (!ValuesToVisit.IsEmpty()) {
 			continue;
@@ -71,8 +77,7 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 	return TArray<FPathSection>();
 }
 
-void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues> &ValuesToVisit, float actionExploreStart, 
-	FGeneratedBeatValues actionBeingExplored, bool &isMoving)
+void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool& isMoving, FVector& CurrentDirection, FVector& CurrentPosition)
 {
 	bool hasFurtherActionBeenExplored;
 
@@ -88,36 +93,103 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues> &Values
 	float currentActionEndTime = actionExploreStart + actionBeingExplored.Duration;
 	float lowestFurtherBeatStartTime = currentActionEndTime;
 	FGeneratedBeatValues furtherActionToExplore;
+	FPathSection newSection;
 
-	for (FGeneratedBeatValues Beat : ValuesToVisit) {
-		if (lowestFurtherBeatStartTime > Beat.StartTime) {
-			lowestFurtherBeatStartTime = Beat.StartTime;
-			furtherActionToExplore = Beat;
+	bool isThereFurtherActionToExplore = true;
+
+	float lastFurtherActionStartTime;
+
+	while (isThereFurtherActionToExplore) {
+		isThereFurtherActionToExplore = false;
+
+		for (FGeneratedBeatValues Beat : ValuesToVisit) {
+			if (lowestFurtherBeatStartTime > Beat.StartTime) {
+				lowestFurtherBeatStartTime = Beat.StartTime;
+				furtherActionToExplore = Beat;
+				isThereFurtherActionToExplore = true;
+			}
 		}
-	}
 
-	if (lowestFurtherBeatStartTime != currentActionEndTime) {
+		if (!isThereFurtherActionToExplore) {
+			break;
+		}
+
+		ValuesToVisit.Remove(furtherActionToExplore);
+
+		hasFurtherActionBeenExplored = true;
 		switch (actionBeingExplored.ActionType)
 		{
 		case EActionType::Move:
-			
+
+			if (lastFurtherActionStartTime != lowestFurtherBeatStartTime) {
+				newSection.SectionType = EPathSectionType::Flat;
+				newSection.StartPosition = CurrentPosition;
+				newSection.EndPosition = GetPositionFromFlatMoving(CurrentPosition, 0.0f, actionBeingExplored.Duration, CurrentDirection);
+				CurrentPath.Add(newSection);
+
+				CurrentPosition = newSection.EndPosition;
+			}
+			ExploreCurrentAction(ValuesToVisit, furtherActionToExplore.StartTime, furtherActionToExplore, isMoving, CurrentDirection, CurrentPosition);
+
 			break;
 		default:
 			break;
 		}
+
+		lastFurtherActionStartTime = lowestFurtherBeatStartTime;
+	}
+
+	if (hasFurtherActionBeenExplored) {
+
 	}
 	else {
-		FPathSection newSection;
-
 		switch (actionBeingExplored.ActionType)
 		{
 		case EActionType::Move:
 			newSection.SectionType = EPathSectionType::Flat;
-			newSection.st
+			newSection.StartPosition = CurrentPosition;
+			newSection.EndPosition = GetPositionFromFlatMoving(CurrentPosition, 0.0f, actionBeingExplored.Duration, CurrentDirection);
+			CurrentPath.Add(newSection);
+
+			CurrentPosition = newSection.EndPosition;
 			break;
 		default:
 			break;
 		}
 	}
+}
+
+// Current speed is added for future implementation that might require it
+FVector UPathRealisation::GetPositionFromFlatMoving(FVector StartPosition, float CurrentSpeed, float Duration, FVector Direction)
+{
+	if (Direction.IsNearlyZero()) { return FVector::ZeroVector; }
+		
+	const UCharacterMovementComponent* movementComponent = PlayerCharacter->GetCharacterMovement();
+
+	float maxSpeed = movementComponent->MaxWalkSpeed;
+	float maxAcceleration = movementComponent->GetMaxAcceleration();
+	float friction = movementComponent->GroundFriction;
+	float braking = movementComponent->BrakingDecelerationWalking;
+
+	const float deltaTime = 0.016f; // 60 FPS
+	float velocity = 0.f;
+	FVector totalMovement = FVector::ZeroVector;
+
+	FVector normalisedDirection = Direction.GetSafeNormal(); // Ensure normalized
+
+	// Simulate movement frame by frame
+	for (float time = 0.f; time < Duration; time += deltaTime)
+	{
+		velocity += movementComponent->GetMaxAcceleration() * deltaTime;
+		velocity = FMath::Min(velocity, movementComponent->MaxWalkSpeed);
+
+		// Apply friction
+		velocity *= FMath::Clamp(1.f - movementComponent->GroundFriction * deltaTime, 0.f, 1.f);
+
+		// Move
+		totalMovement += normalisedDirection * velocity * deltaTime;
+	}
+
+	return StartPosition + totalMovement;
 }
 

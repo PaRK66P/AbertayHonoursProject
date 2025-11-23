@@ -48,5 +48,10 @@ void UGeometryRealisationComponent::TickComponent(float DeltaTime, ELevelTick Ti
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
 
+FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FGeneratedBeatValues> Path, FVector PathOrigin)
+{
+	return FVector();
+}
+
 
 

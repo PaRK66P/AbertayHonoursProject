@@ -4,9 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "GeometryRealisationComponent.generated.h"
 
-struct FGeneratedBeatValues;
+#include "RhythmGenerationComponent.h"
+
+
+#include "GeometryRealisationComponent.generated.h"
 
 UENUM(BlueprintType)
 enum class ENodeType : uint8
@@ -54,7 +56,7 @@ public:
 	{
 		if (X < 0 || X >= ChunkSize || Y < 0 || Y >= ChunkSize) {
 
-			UE_LOG(Error, Error,
+			UE_LOG(LogTemp, Error,
 				TEXT("Node out of range: %i, %i"),
 				X, Y);
 			return ErrorNode;

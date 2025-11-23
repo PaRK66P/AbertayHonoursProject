@@ -27,6 +27,13 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float Duration;
+
+	bool operator==(const FGeneratedBeatValues& Other) const
+	{
+		return ActionType == Other.ActionType
+			&& StartTime == Other.StartTime
+			&& Duration == Other.Duration;
+	}
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
