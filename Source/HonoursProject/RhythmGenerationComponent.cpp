@@ -20,8 +20,6 @@ void URhythmGenerationComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// ...
-	
-	GenerateRhythmGroup(20.0f);
 }
 
 
@@ -88,22 +86,18 @@ TArray<FGeneratedBeatValues> URhythmGenerationComponent::GenerateRhythmGroup(flo
 		newBeat.ActionType = isJumpAction ? EActionType::Jump : EActionType::Move;
 		newBeat.Duration = isJumpAction ? FMath::FRandRange(JumpActionDurationMin, JumpActionDurationMax) : FMath::FRandRange(MoveActionDurationMin, MoveActionDurationMax);
 
+		if (i + newBeat.Duration > Length) {
+			newBeat.Duration = Length - i;
+		}
+
 		GeneratedRhythmGroup.Add(newBeat);
 
 		if (isJumpAction) {
-			UE_LOG(LogTemp, Display,
-				TEXT("Jump action at %i for %fs"),
-				i, newBeat.Duration);
-
 			isJumping = true;
 			jumpDuration = 0.0f;
 			currentJumpLength = newBeat.Duration;
 		}
 		else {
-			UE_LOG(LogTemp, Display,
-				TEXT("Move action at %i for %fs"),
-				i, newBeat.Duration);
-
 			isMoving = true;
 			moveDuration = 0.0f;
 			currentMoveLength = newBeat.Duration;
