@@ -8,16 +8,9 @@
 #include "PathRealisation.generated.h"
 
 enum class EActionType : uint8;
+enum class EPathSectionType : uint8;
 struct FGeneratedBeatValues;
-
-UENUM(BlueprintType)
-enum class EPathSectionType : uint8
-{
-	Flat UMETA(DisplayName = "Flat"),
-	Arc UMETA(DisplayName = "Arc"),
-	Safe UMETA(DisplayName = "Safe"), // Refers to a positions that guarantees they are on a platform as all points are not always guaranteed
-	IncompleteArc UMETA(DisplayName = "Incomplete Arc") // Not all jump arcs are full as they will be split up through different points
-};
+class UActionGrammarsHolder;
 
 USTRUCT(BlueprintType)
 struct FActionEndValues
@@ -27,6 +20,26 @@ struct FActionEndValues
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EActionType ActionType;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsMove;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsSloped;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsSteep;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsUp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsJump;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsGap;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int VerticalDirection; // 0 = Up, 1 = Forward, 2 = Down
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int VerticalSize; // 0 = Short, 1 = Medium, 2 = Long
+
+
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	float EndTime;
@@ -46,6 +59,24 @@ struct FPathSection
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EPathSectionType SectionType;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsMove;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsSloped;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsSteep;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsUp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsJump;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool IsGap;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int VerticalDirection; // 0 = Up, 1 = Forward, 2 = Down
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int VerticalSize; // 0 = Short, 1 = Medium, 2 = Long
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FVector StartPosition;
@@ -70,7 +101,10 @@ public:
 	// Sets default values for this component's properties
 	UPathRealisation();
 
+	void SetActionGrammarReference(UActionGrammarsHolder* reference);
+
 	TArray<FPathSection> CurrentPath;
+	UActionGrammarsHolder* actionGrammarsReference;
 
 protected:
 	// Called when the game starts
@@ -88,5 +122,9 @@ public:
 
 	// Physics Calculations
 	FVector GetPositionFromFlatMoving(FVector StartPosition, float & CurrentSpeed, float Duration, FVector Direction);
+
+	FVector AddMoveAction(FVector startingPosition, FVector facingDirection, float duration);
+	FVector AddJumpAction(FVector startingPosition, FVector facingDirection);
+
 
 };

@@ -9,6 +9,7 @@
 class UPathRealisation;
 class UGeometryRealisationComponent;
 class URhythmGenerationComponent;
+class UActionGrammarsHolder;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class HONOURSPROJECT_API UPCG_LevelCreator : public UActorComponent
@@ -39,6 +40,8 @@ protected:
 	UGeometryRealisationComponent* GeometryRealisation;
 	UPROPERTY()
 	URhythmGenerationComponent* RhythmGeneration;
+	UPROPERTY()
+	UActionGrammarsHolder* ActionGrammarsHolder;
 
 public:	
 	// Called every frame

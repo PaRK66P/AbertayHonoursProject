@@ -49,7 +49,7 @@ public:
 	float BeatDensity;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int BeatOccurence;
+	float BeatOccurence;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<FGeneratedBeatValues> GeneratedRhythmGroup;

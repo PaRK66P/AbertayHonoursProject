@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 
 #include "RhythmGenerationComponent.h"
+#include "ActionGrammarsHolder.h"
 
 // Sets default values for this component's properties
 UPathRealisation::UPathRealisation()
@@ -17,6 +18,11 @@ UPathRealisation::UPathRealisation()
 	PrimaryComponentTick.bCanEverTick = true;
 
 	// ...
+}
+
+void UPathRealisation::SetActionGrammarReference(UActionGrammarsHolder* reference)
+{
+	actionGrammarsReference = reference;
 }
 
 
@@ -58,17 +64,12 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 	// Holds when an action ends at what time to be resolved
 	TArray<FActionEndValues> actionEndList;
 
-	FPathSection startSection;
-	startSection.SectionType = EPathSectionType::Safe;
-	startSection.StartPosition = Origin;
-	startSection.EndPosition = Origin;
-	CurrentPath.Add(startSection);
-
 	int indexToRemoveAt = 0;
-	currentBeat = ValuesToVisit[0];
+	
 
 	while (!isPathGenerated) {
 		lowestBeatStartTime = ValuesToVisit[0].StartTime;
+		currentBeat = ValuesToVisit[0];
 
 		for (int i = 0; i < ValuesToVisit.Num(); i++) {
 			if (lowestBeatStartTime > ValuesToVisit[i].StartTime) {
@@ -96,6 +97,7 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 // But at this point there's a lot so maybe consider making them member variables of the class
 void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool& isMoving, FVector& CurrentDirection, FVector& CurrentPosition, float& CurrentSpeed, TArray<FActionEndValues>& ActionEndList)
 {
+	FPathSection newSection;
 	bool hasFurtherActionBeenExplored = false;
 
 	switch (actionBeingExplored.ActionType)
@@ -112,7 +114,6 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 	float currentActionEndTime = actionExploreStart + actionBeingExplored.Duration;
 	float lowestFurtherBeatStartTime = currentActionEndTime;
 	FGeneratedBeatValues furtherActionToExplore;
-	FPathSection newSection;
 
 	FVector currentActionTrueStartPosition = CurrentPosition;
 
@@ -127,9 +128,11 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 
 	int indexToRemoveAt;
 
+
 	// Keeps track of current actions start time between the splits
 	// Since it only matters to this iteration it doesn't need to be tracked outside
 	float currentStartTime = actionExploreStart;
+	// Checks for other actions during the current one
 	while (isThereFurtherActionToExplore) {
 		isThereFurtherActionToExplore = false;
 		lowestFurtherBeatStartTime = currentActionEndTime;
@@ -147,6 +150,8 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 			}
 		}
 
+		// Checking if any actions need to end
+		// CHANGE THIS
 		if (!ActionEndList.IsEmpty()) {
 			// This causes a disrupt in the action, changing the action midway essentially creating a new action
 			// Which is why this is then true
@@ -163,38 +168,12 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 			ActionEndList.RemoveAt(indexToRemoveAt);
 
 			// Resolve rest of the current action before the action ends
+			// Not sure this is necessary with new changes, will test now
 			switch (actionBeingExplored.ActionType)
 			{
 			case EActionType::Move:
-				// Split the action and resolve the part before the further action takes place
-				newSection.SectionType = EPathSectionType::Flat;
-				newSection.StartPosition = CurrentPosition;
-				newSection.EndPosition = GetPositionFromFlatMoving(
-					CurrentPosition, 
-					CurrentSpeed, 
-					lowestEndActionTime - currentStartTime,
-					CurrentDirection);
-				CurrentPath.Add(newSection);
-
-				CurrentPosition = newSection.EndPosition;
-
-				// Ends of movements are always a safe spot
-				newSection.SectionType = EPathSectionType::Safe;
-				newSection.StartPosition = CurrentPosition;
-				newSection.EndPosition = CurrentPosition;
-				CurrentPath.Add(newSection);
 				break;
 			case EActionType::Jump:
-				newSection.SectionType = EPathSectionType::IncompleteArc;
-				newSection.StartPosition = CurrentPosition;
-				newSection.EndPosition = DetermineArcEndpoint(
-					currentActionTrueStartPosition,
-					lowestEndActionTime - actionBeingExplored.StartTime,
-					CurrentSpeed,
-					CurrentDirection);
-				CurrentPath.Add(newSection);
-
-				CurrentPosition = newSection.EndPosition;
 				break;
 			default:
 				break;
@@ -222,103 +201,69 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 
 		ValuesToVisit.RemoveAt(indexToRemoveAt);
 
-		hasFurtherActionBeenExplored = true;
+		// Resolve current action up to the start of the further action
 		switch (actionBeingExplored.ActionType)
 		{
 		case EActionType::Move:
-			// Split the action and resolve the part before the further action takes place
-			newSection.SectionType = EPathSectionType::Flat;
-			newSection.StartPosition = CurrentPosition;
-			newSection.EndPosition = GetPositionFromFlatMoving(
-				CurrentPosition, 
-				CurrentSpeed, 
-				furtherActionToExplore.StartTime - currentStartTime,
-				CurrentDirection);
-			CurrentPath.Add(newSection);
 
-			CurrentPosition = newSection.EndPosition;
+			UE_LOG(LogTemp, Log, TEXT("Move action %f %f %f"),
+				furtherActionToExplore.StartTime, currentStartTime, actionBeingExplored.StartTime);
+			CurrentPosition = AddMoveAction(CurrentPosition, CurrentDirection,
+				furtherActionToExplore.StartTime - currentStartTime);
+			currentStartTime = furtherActionToExplore.StartTime;
 
-			// Ends of movements are always a safe spot
-			newSection.SectionType = EPathSectionType::Safe;
-			newSection.StartPosition = CurrentPosition;
-			newSection.EndPosition = CurrentPosition;
-			CurrentPath.Add(newSection);
-
-			currentStartTime = lowestFurtherBeatStartTime + furtherActionToExplore.Duration;
-
-			if (furtherActionToExplore.Duration + furtherActionToExplore.StartTime > actionBeingExplored.StartTime + actionBeingExplored.Duration) {
+			// Check if action ends during the next one
+			if (currentActionEndTime < furtherActionToExplore.StartTime + furtherActionToExplore.Duration) {
 				FActionEndValues newEndValues;
 				newEndValues.ActionType = EActionType::Move;
-				newEndValues.EndTime = actionBeingExplored.StartTime + actionBeingExplored.Duration;
-				
+				newEndValues.EndTime = currentActionEndTime;
+
 				ActionEndList.Add(newEndValues);
 
 				hasActionEnded = true; // Once the further action iterations are finished this action will have ended
 				isThereFurtherActionToExplore = false; // This also means we don't need to keep exploring more actions afterwards
 			}
 
-			ExploreCurrentAction(ValuesToVisit, 
-				furtherActionToExplore.StartTime, 
-				furtherActionToExplore, 
-				isMoving, CurrentDirection, 
-				CurrentPosition, 
-				CurrentSpeed, 
+			ExploreCurrentAction(ValuesToVisit,
+				furtherActionToExplore.StartTime,
+				furtherActionToExplore,
+				isMoving, CurrentDirection,
+				CurrentPosition,
+				CurrentSpeed,
 				ActionEndList);
 
 			break;
-		// With current implementation this arguable does nothing. The movement is lateral and doesn't interrupt the jump arc and jumping can't happen twice.
-		// However later implementation will have movement interupt the arc horizontal movement with turning.
-		// Thus the current implementation.
 		case EActionType::Jump:
-			newSection.SectionType = EPathSectionType::IncompleteArc;
-			newSection.StartPosition = CurrentPosition;
-			newSection.EndPosition = DetermineArcEndpoint(
-				currentActionTrueStartPosition,
-				furtherActionToExplore.StartTime - actionBeingExplored.StartTime,
-				CurrentSpeed, 
-				CurrentDirection);
-			CurrentPath.Add(newSection);
 
-			CurrentPosition = newSection.EndPosition;
-
-			currentStartTime = lowestFurtherBeatStartTime;
-
-			if (furtherActionToExplore.ActionType == EActionType::Move) {
-				// We can't move during a jump but it does change if the jump is in motion or not
-				// Because of this we have to handle this case uniquely
-				isMoving = true;
-
-				if (furtherActionToExplore.Duration + furtherActionToExplore.StartTime >
-					actionBeingExplored.Duration + actionBeingExplored.StartTime) {
-					// This situation becomes very funky and more complex to handle as the action needs to track a path once this action is done
-					// The simple hacky way to do this is to add another action to the rhythm group
-					// This action is for the tracking part at the end
-					// It won't overlap with the action as it has already been removed from the list
-					FGeneratedBeatValues tempMoveBeat;
-					tempMoveBeat.ActionType = EActionType::Move;
-					tempMoveBeat.StartTime = actionBeingExplored.Duration + actionBeingExplored.StartTime;
-					tempMoveBeat.Duration = furtherActionToExplore.Duration;
-
-					ValuesToVisit.Add(tempMoveBeat);
-				}
-				else {
-					FActionEndValues newEndValues;
-					newEndValues.ActionType = EActionType::Move;
-					newEndValues.EndTime = actionBeingExplored.StartTime + actionBeingExplored.Duration;
-
-					ActionEndList.Add(newEndValues);
-				}
-				break; // We don't want to explore this action as the path would be added to the current jump happening
+			// Jumps ignore move actions until finished
+			if (currentActionEndTime >= furtherActionToExplore.StartTime + furtherActionToExplore.Duration) {
+				break;
 			}
 
-			ExploreCurrentAction(ValuesToVisit, 
-				furtherActionToExplore.StartTime, 
-				furtherActionToExplore, 
-				isMoving, 
-				CurrentDirection, 
-				CurrentPosition, 
-				CurrentSpeed, 
-				ActionEndList);
+			CurrentPosition = AddJumpAction(CurrentPosition, CurrentDirection);
+			// Jumps have a fixed time value
+			currentStartTime = actionBeingExplored.StartTime + 1.0f;
+
+			hasActionEnded = true;
+
+			switch (furtherActionToExplore.ActionType) {
+			case EActionType::Move:
+				
+
+				ExploreCurrentAction(ValuesToVisit,
+					furtherActionToExplore.StartTime,
+					furtherActionToExplore,
+					isMoving, CurrentDirection,
+					CurrentPosition,
+					CurrentSpeed,
+					ActionEndList);
+
+				break;
+			default:
+				// At the moment jumps can't happen during a jump
+				break;
+			}
+
 			break;
 		default:
 			break;
@@ -327,47 +272,28 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 		lastFurtherActionStartTime = lowestFurtherBeatStartTime;
 	}
 
+
+	if (hasActionEnded) {
+		return;
+	}
+
 	switch (actionBeingExplored.ActionType)
 	{
 	case EActionType::Move:
-		newSection.SectionType = EPathSectionType::Flat;
-		newSection.StartPosition = CurrentPosition;
-		newSection.EndPosition = GetPositionFromFlatMoving(
-			CurrentPosition, 
-			CurrentSpeed, 
-			actionBeingExplored.Duration - (currentStartTime - actionBeingExplored.StartTime), 
-			CurrentDirection);
-		CurrentPath.Add(newSection);
-
-		CurrentPosition = newSection.EndPosition;
-
-		isMoving = false;
-		CurrentSpeed = 0.0f;
+		UE_LOG(LogTemp, Log, TEXT("Move action %f %f %f"),
+			actionBeingExplored.Duration, currentStartTime, actionBeingExplored.StartTime);
+		CurrentPosition = AddMoveAction(CurrentPosition, CurrentDirection,
+			actionBeingExplored.Duration - (currentStartTime - actionBeingExplored.StartTime));
+		currentStartTime = actionBeingExplored.Duration + actionBeingExplored.StartTime;
 		break;
 	case EActionType::Jump:
-		newSection.SectionType = hasFurtherActionBeenExplored ? 
-			EPathSectionType::IncompleteArc : EPathSectionType::Arc;
-		newSection.StartPosition = CurrentPosition;
-
-		newSection.EndPosition = DetermineArcEndpoint(
-			(hasFurtherActionBeenExplored ? 
-				currentActionTrueStartPosition : CurrentPosition), // Arc vertical position will never be changed with actions so we can calculate the whole arc from the start even if it was split up
-			actionBeingExplored.Duration, // Duration doesn't change as we calculate the full arc
-			CurrentSpeed,
-			CurrentDirection);
-		CurrentPath.Add(newSection);
-
-		CurrentPosition = newSection.EndPosition;
+		CurrentPosition = AddJumpAction(CurrentPosition, CurrentDirection);
+		// Jumps have a fixed time value
+		currentStartTime = actionBeingExplored.StartTime + 1.0f;
 		break;
 	default:
 		break;
 	}
-
-	// Signal in the path that if the platforms were unclear one would guarantee to be here
-	newSection.SectionType = EPathSectionType::Safe;
-	newSection.StartPosition = CurrentPosition;
-	newSection.EndPosition = CurrentPosition;
-	CurrentPath.Add(newSection);
 }
 
 FVector UPathRealisation::DetermineArcEndpoint(FVector StartPosition, float Duration, float CurrentSpeed, FVector CurrentDirection)
@@ -389,6 +315,7 @@ FVector UPathRealisation::DetermineArcEndpoint(FVector StartPosition, float Dura
 	return arcPosition;
 }
 
+// This was not needed (D:)
 // Current speed is added for future implementation that might require it (IT WAS NEEDED :D)
 FVector UPathRealisation::GetPositionFromFlatMoving(FVector StartPosition, float& CurrentSpeed, float Duration, FVector Direction)
 {
@@ -420,5 +347,151 @@ FVector UPathRealisation::GetPositionFromFlatMoving(FVector StartPosition, float
 	}
 
 	return StartPosition + totalMovement;
+}
+
+FVector UPathRealisation::AddMoveAction(FVector startingPosition, FVector facingDirection, float duration)
+{
+
+	UE_LOG(LogTemp, Log, TEXT("Facing %f %f %f"),
+		facingDirection.X, facingDirection.Y, facingDirection.Z);
+	FPathSection newSection;
+	newSection.SectionType = EPathSectionType::Move;
+	newSection.IsMove = true;
+	newSection.StartPosition = startingPosition;
+
+	// Create speed variable somewhere [speed = 5m/s, 1m == 100 Unreal Units]
+	FVector distanceVector = 500 * facingDirection * duration;
+
+	float actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Flat)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped);
+
+	newSection.IsSloped = FMath::FRandRange(0.0f, actionSectionChanceTotal)
+		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Flat);
+	if (!(newSection.IsSloped)) {
+		newSection.EndPosition = distanceVector + startingPosition;
+
+		CurrentPath.Add(newSection);
+		UE_LOG(LogTemp, Log, TEXT("Moving from (%f, %f, %f) to (%f, %f, %f)"),
+			startingPosition.X, startingPosition.Y, startingPosition.Z,
+			newSection.EndPosition.X, newSection.EndPosition.Y, newSection.EndPosition.Z);
+
+		return newSection.EndPosition;
+	}
+
+	actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Gradual);
+
+	newSection.IsSteep = FMath::FRandRange(0.0f, actionSectionChanceTotal)
+		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep);
+
+
+	actionSectionChanceTotal = newSection.IsSteep ?
+		actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep_Up)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep_Down)
+		: actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Gradual_Up)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Gradual_Down);
+
+	newSection.IsUp = FMath::FRandRange(0.0f, actionSectionChanceTotal)
+		<= actionGrammarsReference->GetActionOccurenceChance(newSection.IsSteep ?
+			EPathSectionType::Sloped_Steep_Up
+			: EPathSectionType::Sloped_Gradual_Up);
+
+	// For now hardcoded -> Make variable in ActionGrammarsHolder
+	float movementAngle =
+		(newSection.IsSteep ?
+			30.0f
+			: 15.0f)
+		*
+		(newSection.IsUp ?
+			-1.0f
+			: 1.0f);
+
+	newSection.EndPosition = distanceVector.RotateAngleAxis(movementAngle,
+		FVector::CrossProduct(FVector::UpVector, distanceVector).GetSafeNormal())
+		+ startingPosition;
+
+	CurrentPath.Add(newSection);
+
+	UE_LOG(LogTemp, Log, TEXT("Moving from (%f, %f, %f) to (%f, %f, %f)"),
+		startingPosition.X, startingPosition.Y, startingPosition.Z,
+		newSection.EndPosition.X, newSection.EndPosition.Y, newSection.EndPosition.Z);
+
+	return newSection.EndPosition;
+}
+
+FVector UPathRealisation::AddJumpAction(FVector startingPosition, FVector facingDirection)
+{
+	UE_LOG(LogTemp, Log, TEXT("Facing %f %f %f"),
+		facingDirection.X, facingDirection.Y, facingDirection.Z);
+
+	FPathSection newSection;
+	newSection.SectionType = EPathSectionType::Jump;
+	newSection.IsJump = true;
+	newSection.StartPosition = startingPosition;
+
+	float actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap);
+
+	newSection.IsGap = FMath::FRandRange(0.0f, actionSectionChanceTotal)
+		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap);
+
+	actionSectionChanceTotal =
+		newSection.IsGap ?
+		actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Up)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Forward)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Down)
+		: actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap_Up)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap_Down);
+
+
+	float actionSectionChanceCurrent = FMath::FRandRange(0.0f, actionSectionChanceTotal);
+
+	if (actionSectionChanceCurrent
+		<= actionGrammarsReference->GetActionOccurenceChance(
+			newSection.IsGap ?
+			EPathSectionType::Jump_Gap_Up
+			: EPathSectionType::Jump_NoGap_Up)) {
+		newSection.VerticalDirection = 0;
+	}
+	else if (newSection.IsGap
+		&& actionSectionChanceCurrent
+		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Up)
+		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Forward)) {
+		newSection.VerticalDirection = 1;
+	}
+	else {
+		newSection.VerticalDirection = 2;
+	}
+
+	// Why is this section hardcoded?
+	// Because I didn't want a triple indented 3 split per indent if statement web that I couldn't understand
+	// PLEASE GET THE BIT FLAGS IMPLEMENTED
+	actionSectionChanceTotal = 0.0f;
+	newSection.VerticalSize = 1; // Fixed for now
+	FVector distanceVector = FVector::ZeroVector;
+	distanceVector += newSection.IsGap ?
+		facingDirection * 400.0f
+		:
+		facingDirection * 100.0f;
+	switch (newSection.VerticalDirection) {
+	case 0: // Up
+		distanceVector.Z += 200.0f;
+		break;
+	case 2:
+		distanceVector.Z -= 200.0f;
+		break;
+	default:
+		break;
+	}
+
+	newSection.EndPosition = startingPosition + distanceVector;
+
+	CurrentPath.Add(newSection);
+
+	UE_LOG(LogTemp, Log, TEXT("Jumping from (%f, %f, %f) to (%f, %f, %f)"), 
+		startingPosition.X, startingPosition.Y, startingPosition.Z,
+		newSection.EndPosition.X, newSection.EndPosition.Y, newSection.EndPosition.Z);
+
+	return newSection.EndPosition;
 }
 

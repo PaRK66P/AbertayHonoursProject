@@ -4,6 +4,7 @@
 #include "GeometryRealisationComponent.h"
 
 #include "PathRealisation.h"
+#include "ActionGrammarsHolder.h"
 
 // Sets default values for this component's properties
 UGeometryRealisationComponent::UGeometryRealisationComponent()
@@ -42,40 +43,21 @@ void UGeometryRealisationComponent::InitialiseComponent()
 */
 FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, FVector PathOrigin)
 {
-	SetNodeAtPosition(PathOrigin, ENodeType::Platform);
 
-	FVector lineDistance;
-	int platformWidth;
-	int platformLength;
+	//SetNodeAtPosition(PathOrigin, ENodeType::Platform);
+
+	//FVector lineDistance;
 
 	for (FPathSection PathSection : Path) {
 		switch (PathSection.SectionType)
 		{
-		case EPathSectionType::Flat:
-			lineDistance = PathSection.EndPosition - PathSection.StartPosition;
-			platformWidth = FMath::CeilToInt(FMath::Abs(lineDistance.X) / NodeDimensions.X);
-			platformWidth = FMath::Max(platformWidth, 1); // Really should be 1 but this makes the platforms wider whilst other features are being implemented
-			platformLength = FMath::CeilToInt(FMath::Abs(lineDistance.Y) / NodeDimensions.Y);
-			platformLength = FMath::Max(platformLength, 3);
-
-			for (int Width = 0; Width < platformWidth; Width++) {
-				for (int Length = 0; Length < platformLength; Length++) {
-					SetNodeAtPosition(PathSection.StartPosition + 
-						FVector(Width * NodeDimensions.X, Length * NodeDimensions.Y, 0.0f), 
-						ENodeType::Platform);
-				}
-			}
+		case EPathSectionType::Move:
+			UE_LOG(LogTemp, Warning, TEXT("Drawing Line"));
+			DrawDebugLine(GetWorld(), PathSection.StartPosition, PathSection.EndPosition, FColor::Red, true, -1.0f, (uint8)0U, 10.0f);
 			break;
-		case EPathSectionType::Safe: // Safe sections are a single node
-			SetNodeAtPosition(PathSection.StartPosition, ENodeType::Platform);
-			break;
-		case EPathSectionType::Arc:
-			// Arcs start and end on a platform
-			SetNodeAtPosition(PathSection.StartPosition, ENodeType::Platform);
-			SetNodeAtPosition(PathSection.EndPosition, ENodeType::Platform);
-			break;
-		case EPathSectionType::IncompleteArc:
-			// Only needs to implement the path
+		case EPathSectionType::Jump:
+			UE_LOG(LogTemp, Warning, TEXT("Drawing Line"));
+			DrawDebugLine(GetWorld(), PathSection.StartPosition, PathSection.EndPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
 			break;
 		default:
 			break;

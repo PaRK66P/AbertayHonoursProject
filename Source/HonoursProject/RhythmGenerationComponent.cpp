@@ -84,6 +84,7 @@ TArray<FGeneratedBeatValues> URhythmGenerationComponent::GenerateRhythmGroup(flo
 
 
 		newBeat.ActionType = isJumpAction ? EActionType::Jump : EActionType::Move;
+		// Jump duration is determined by type of jump
 		newBeat.Duration = isJumpAction ? FMath::FRandRange(JumpActionDurationMin, JumpActionDurationMax) : FMath::FRandRange(MoveActionDurationMin, MoveActionDurationMax);
 
 		if (i + newBeat.Duration > Length) {

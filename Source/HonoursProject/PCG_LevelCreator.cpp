@@ -6,6 +6,7 @@
 #include "PathRealisation.h"
 #include "GeometryRealisationComponent.h"
 #include "RhythmGenerationComponent.h"
+#include "ActionGrammarsHolder.h"
 
 #include "Kismet/GameplayStatics.h"
 
@@ -50,31 +51,9 @@ void UPCG_LevelCreator::GenerateLevel(int NumberOfSections)
 		if (pathGenerated.IsEmpty()) {
 			return;
 		}
-		for (FPathSection Section : pathGenerated) {
-			if (Section.SectionType == EPathSectionType::Arc) {
-				UE_LOG(LogTemp, Log, TEXT("Arc from (%f, %f, %f) to (%f, %f, %f)"),
-					Section.StartPosition.X, Section.StartPosition.Y, Section.StartPosition.Z,
-					Section.EndPosition.X, Section.EndPosition.Y, Section.EndPosition.Z);
-			}
-			if (Section.SectionType == EPathSectionType::IncompleteArc) {
-				UE_LOG(LogTemp, Log, TEXT("Incomplete Arc from (%f, %f, %f) to (%f, %f, %f)"),
-					Section.StartPosition.X, Section.StartPosition.Y, Section.StartPosition.Z,
-					Section.EndPosition.X, Section.EndPosition.Y, Section.EndPosition.Z);
-			}
-			if (Section.SectionType == EPathSectionType::Flat) {
-				UE_LOG(LogTemp, Log, TEXT("Flat from (%f, %f, %f) to (%f, %f, %f)"),
-					Section.StartPosition.X, Section.StartPosition.Y, Section.StartPosition.Z,
-					Section.EndPosition.X, Section.EndPosition.Y, Section.EndPosition.Z);
-			}
-			if (Section.SectionType == EPathSectionType::Safe) {
-				UE_LOG(LogTemp, Log, TEXT("Safe from (%f, %f, %f) to (%f, %f, %f)"),
-					Section.StartPosition.X, Section.StartPosition.Y, Section.StartPosition.Z,
-					Section.EndPosition.X, Section.EndPosition.Y, Section.EndPosition.Z);
-			}
-		}
 
 		MessageStartPosition = SectionStartPosition;
-		SectionStartPosition += GeometryRealisation->AddPathToGrid(pathGenerated, SectionStartPosition);
+		SectionStartPosition = GeometryRealisation->AddPathToGrid(pathGenerated, SectionStartPosition);
 		UE_LOG(LogTemp, Log, TEXT("Geometry realised"));
 		UE_LOG(LogTemp, Log, TEXT("Geometry from (%f, %f, %f) to (%f, %f, %f)"),
 			MessageStartPosition.X, MessageStartPosition.Y, MessageStartPosition.Z,
@@ -90,6 +69,7 @@ void UPCG_LevelCreator::GenerateLevel(int NumberOfSections)
 void UPCG_LevelCreator::BeginPlay()
 {
 	Super::BeginPlay();
+	UE_LOG(LogTemp, Warning, TEXT("Begin"));
 
 	PathRealisation = GetOwner()->FindComponentByClass<UPathRealisation>();
 	if (!PathRealisation) {
@@ -104,10 +84,16 @@ void UPCG_LevelCreator::BeginPlay()
 	if (!RhythmGeneration) {
 		UE_LOG(LogTemp, Warning, TEXT("No Rhythm"));
 	}
+	ActionGrammarsHolder = GetOwner()->FindComponentByClass<UActionGrammarsHolder>();
+	if (!ActionGrammarsHolder) {
+		UE_LOG(LogTemp, Warning, TEXT("No Action Grammars"));
+	}
 
-	if (!PathRealisation || !GeometryRealisation || !RhythmGeneration) {
+	if (!PathRealisation || !GeometryRealisation || !RhythmGeneration || !ActionGrammarsHolder) {
 		return;
 	}
+
+	PathRealisation->SetActionGrammarReference(ActionGrammarsHolder);
 
 	GenerateLevel(LevelSections);
 
