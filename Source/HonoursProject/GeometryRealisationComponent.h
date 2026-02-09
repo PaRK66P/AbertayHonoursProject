@@ -8,12 +8,13 @@
 #include "GeometryRealisationComponent.generated.h"
 
 struct FPathSection;
+class UActionGrammarsHolder;
 
 UENUM(BlueprintType)
 enum class ENodeType : uint8
 {
 	Open UMETA(DisplayName = "Open"),
-	Path UMETA(DisplayName = "Path"),
+	Path UMETA(DisplayName = "Path"), // Area player travels across
 	Platform UMETA(DisplayName = "Platform")
 };
 
@@ -25,12 +26,30 @@ struct FNodeStruct
 public:
 	FVector Position;
 	ENodeType NodeType = ENodeType::Open;
+	bool isBlocking = false;
 
 	void SetNodeValues(FVector NodePosition, ENodeType ChosenNodeType) {
 		Position = NodePosition;
 		NodeType = ChosenNodeType;
 	}
 };
+
+USTRUCT(BlueprintType)
+struct FGenerationPlatform
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	UPROPERTY()
+	FVector startPosition;
+	UPROPERTY()
+	FVector endPosition;
+	UPROPERTY()
+	FRotator rotation;
+	UPROPERTY()
+	AActor* platformRef;
+};
+
 
 USTRUCT(BlueprintType)
 struct FChunkStruct
@@ -107,6 +126,7 @@ public:
 
 };
 
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class HONOURSPROJECT_API UGeometryRealisationComponent : public UActorComponent
 {
@@ -123,38 +143,52 @@ public:
 	FVector GridOrigin;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
-	FVector NodeDimensions;
+	FVector NodeDimensions = FVector(100.0f, 100.0f, 100.0f);
 
 	UPROPERTY()
 	TArray<FChunkStruct> GeometryGrid;
 
 	UPROPERTY()
-	TArray<AActor*> GeneratedPlatforms;
+	TArray<FGenerationPlatform> GeneratedPlatforms;
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
 	FVector ChunkDimensions;
+	UActionGrammarsHolder* ActionGrammarsRef;
 
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	void InitialiseComponent();
+	void InitialiseComponent(UActionGrammarsHolder* ref);
 
 	// Returns the end position for future extension of the Path
-	FVector AddPathToGrid(TArray<FPathSection> Path, FVector PathOrigin);
+	FVector AddPathToGrid(TArray<FPathSection> Path, FVector PathOrigin, FVector& FacingDirection);
 
 	FChunkStruct& AddChunkToGrid(FVector ChunkPosition);
 	FChunkStruct& GetChunkFromGrid(FVector ChunkPosition);
 	FBox GetChunkBoxDimensions(FVector ChunkPosition);
 	FVector GetCenterOfChunkInPosition(FVector ChunkPosition);
 
+	void SetStartingNode(FVector NodePosition);
 	void SetNodeAtPosition(FVector NodePosition, ENodeType NodeType);
+	void SetNodeBlockingAtPosition(FVector NodePosition, bool isBlocking);
 
+	float GenerateTurnAngle();
+
+	// Read only
+	FNodeStruct GetNodeAtPosition(FVector NodePosition);
+	TArray<FVector> GetPlayerNodesAtPosition(FVector CenterBottom, FVector FacingDirection, bool onPlatform = false);
+
+	bool IsNodeOpen(FVector NodePosition);
+
+	bool IsStraightPathFree(FVector StartPosition, FVector TravelVector);
+
+	// Returns lowest point for deathbox
 	UFUNCTION()
-	void GenerateLevel();
+	float GenerateLevel();
 	UFUNCTION()
 	void RemoveGeneratedLevel();
 	UFUNCTION()

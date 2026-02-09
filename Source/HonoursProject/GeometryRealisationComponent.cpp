@@ -30,10 +30,14 @@ void UGeometryRealisationComponent::TickComponent(float DeltaTime, ELevelTick Ti
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
 
-void UGeometryRealisationComponent::InitialiseComponent()
+void UGeometryRealisationComponent::InitialiseComponent(UActionGrammarsHolder* ref)
 {
 	FChunkStruct base;
 	ChunkDimensions = NodeDimensions * base.ChunkSize;
+	ActionGrammarsRef = ref;
+
+	FTurningValues* turningValues = ActionGrammarsRef->GetTurnValues();
+	turningValues->DetermineChances();
 }
 
 /* FUTURE TO DO
@@ -41,30 +45,93 @@ void UGeometryRealisationComponent::InitialiseComponent()
 * Path nodes are implemented to prevent environmental objects blocking the traversal path
 * Since we don't have environmental objects yet I've not implemented this
 */
-FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, FVector PathOrigin)
+FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, FVector PathOrigin, FVector& FacingDirection)
 {
 
-	//SetNodeAtPosition(PathOrigin, ENodeType::Platform);
+	FVector currentPosition = PathOrigin;
+
+	SetStartingNode(PathOrigin);
 
 	//FVector lineDistance;
+
+	FGenerationPlatform generatedPlatform;
+	float rotationAngle;
+	FVector platformRotation;
+
+	generatedPlatform.startPosition = currentPosition;
+	currentPosition += FVector(
+		FacingDirection.X,
+		FacingDirection.Y,
+		0.0f) * 160.0f;
+	generatedPlatform.endPosition = currentPosition;
+	generatedPlatform.rotation = FacingDirection.Rotation();
+	GeneratedPlatforms.Add(generatedPlatform);
 
 	for (FPathSection PathSection : Path) {
 		switch (PathSection.SectionType)
 		{
 		case EPathSectionType::Move:
-			UE_LOG(LogTemp, Warning, TEXT("Drawing Line"));
-			DrawDebugLine(GetWorld(), PathSection.StartPosition, PathSection.EndPosition, FColor::Red, true, -1.0f, (uint8)0U, 10.0f);
+			// ATTEMPT TURN DIRECTION
+			generatedPlatform.startPosition = currentPosition;
+
+			rotationAngle = FMath::DegreesToRadians(GenerateTurnAngle());
+
+			FacingDirection = FacingDirection.GetSafeNormal().RotateAngleAxis(rotationAngle, FVector::UpVector);
+
+			currentPosition += FVector(
+				FacingDirection.X,
+				FacingDirection.Y,
+				0.0f) * PathSection.TravelVector.X
+				+ FVector(0.0f, 0.0f, PathSection.TravelVector.Z);
+
+			generatedPlatform.endPosition = currentPosition;
+			UE_LOG(LogTemp, Log, TEXT("Facing Direction: (%f, %f, %f)"), 
+				FacingDirection.X, FacingDirection.Y, FacingDirection.Z);
+			platformRotation = FVector(FacingDirection.X, FacingDirection.Y, PathSection.TravelVector.GetSafeNormal().Z);
+			UE_LOG(LogTemp, Log, TEXT("PreRotation: (%f, %f, %f)"),
+				platformRotation.X, platformRotation.Y, platformRotation.Z);
+			platformRotation = platformRotation.GetSafeNormal();
+			UE_LOG(LogTemp, Log, TEXT("PostRotation: (%f, %f, %f)"),
+				platformRotation.X, platformRotation.Y, platformRotation.Z);
+			generatedPlatform.rotation = platformRotation.Rotation();
+			UE_LOG(LogTemp, Log, TEXT("Rotator: (%f, %f, %f)"),
+				generatedPlatform.rotation.Pitch, generatedPlatform.rotation.Roll, generatedPlatform.rotation.Yaw);
+			GeneratedPlatforms.Add(generatedPlatform);
+			
+			// ADD PATH SECTION
+			DrawDebugLine(GetWorld(), generatedPlatform.startPosition, generatedPlatform.endPosition, FColor::Red, true, -1.0f, (uint8)0U, 10.0f);
+
+
 			break;
-		case EPathSectionType::Jump:
-			UE_LOG(LogTemp, Warning, TEXT("Drawing Line"));
-			DrawDebugLine(GetWorld(), PathSection.StartPosition, PathSection.EndPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
+		case EPathSectionType::Jump: // Jumping doesn't add a platform, just moves the positions
+
+			rotationAngle = GenerateTurnAngle();
+
+			FacingDirection = FacingDirection.GetSafeNormal().RotateAngleAxis(rotationAngle, FVector::UpVector);
+
+			currentPosition += FVector(
+				FacingDirection.X,
+				FacingDirection.Y,
+				0.0f) * PathSection.TravelVector.X
+				+ FVector(0.0f, 0.0f, PathSection.TravelVector.Z);
+
+			DrawDebugLine(GetWorld(), generatedPlatform.startPosition, generatedPlatform.endPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
 			break;
 		default:
 			break;
 		}
+
+		generatedPlatform.startPosition = currentPosition;
+		currentPosition += FVector(
+			FacingDirection.X,
+			FacingDirection.Y,
+			0.0f) * 160.0f;
+		generatedPlatform.endPosition = currentPosition;
+		generatedPlatform.rotation = FacingDirection.Rotation();
+		GeneratedPlatforms.Add(generatedPlatform);
 	}
 
-	return Path[Path.Num() - 1].EndPosition;
+	return currentPosition;
 }
 
 // Return value is mainly for the Get function bellow
@@ -140,6 +207,17 @@ FVector UGeometryRealisationComponent::GetCenterOfChunkInPosition(FVector ChunkP
 	return ChunkCenter;
 }
 
+void UGeometryRealisationComponent::SetStartingNode(FVector NodePosition)
+{
+	int iterations = 0;
+	SetNodeAtPosition(NodePosition, ENodeType::Platform);
+	for (float i = NodeDimensions.Z; i < ActionGrammarsRef->GetPlayersValues().Height * 100.0f; i += NodeDimensions.Z) {
+		SetNodeAtPosition(NodePosition + FVector(0, i, 0), ENodeType::Path);
+		iterations++;
+	}
+	SetNodeAtPosition(NodePosition + FVector(0, (iterations + 1) * NodeDimensions.Z, 0), ENodeType::Path);
+}
+
 void UGeometryRealisationComponent::SetNodeAtPosition(FVector NodePosition, ENodeType NodeType)
 {
 	FChunkStruct& CurrentChunk = GetChunkFromGrid(NodePosition);
@@ -149,34 +227,249 @@ void UGeometryRealisationComponent::SetNodeAtPosition(FVector NodePosition, ENod
 	CurrentNode.NodeType = NodeType;
 }
 
-void UGeometryRealisationComponent::GenerateLevel()
+void UGeometryRealisationComponent::SetNodeBlockingAtPosition(FVector NodePosition, bool isBlocking)
 {
-	RemoveGeneratedLevel();
-	for (FChunkStruct Chunk : GeometryGrid) {
-		for (FNodeStruct Node : Chunk.ChunkNodes) {
-			if (Node.NodeType == ENodeType::Open) {
-				continue;
-			}
+	FChunkStruct& CurrentChunk = GetChunkFromGrid(NodePosition);
 
-			switch (Node.NodeType)
-			{
-			case ENodeType::Platform:
-				SpawnPlatformAtPosition(Node.Position);
-				break;
-			default:
-				break;
-			}
+	FNodeStruct& CurrentNode = CurrentChunk.GetNodeFromPosition(NodePosition);
+	
+	CurrentNode.isBlocking = isBlocking;
+}
+
+float UGeometryRealisationComponent::GenerateTurnAngle()
+{
+	FTurningValues* turningValues = ActionGrammarsRef->GetTurnValues();
+
+	float turnTotalChanceValues = turningValues->NoTurnChance
+		+ turningValues->SmallTurnChance
+		+ turningValues->LargeTurnChance;
+	float turnRandomValue = FMath::FRandRange(0.0f, turnTotalChanceValues);
+
+	float returnAngle = 0.0f;
+
+	if (turnRandomValue <= turningValues->NoTurnChance) {
+		return returnAngle;
+	}
+	else if (turnRandomValue <= turningValues->NoTurnChance + turningValues->SmallTurnChance) {
+		returnAngle = turningValues->SmallTurnAngle;
+	}
+	else {
+		returnAngle = turningValues->LargeTurnAngle;
+	}
+
+	if (FMath::FRandRange(0.0f, turningValues->LeftTurnChance + turningValues->RightTurnChance)
+		<= turningValues->RightTurnChance) {
+		returnAngle *= -1;
+	}
+
+	return returnAngle;
+}
+
+FNodeStruct UGeometryRealisationComponent::GetNodeAtPosition(FVector NodePosition)
+{
+	FChunkStruct CurrentChunk = GetChunkFromGrid(NodePosition);
+
+	return CurrentChunk.GetNodeFromPosition(NodePosition);
+}
+
+// I'm tired so being lazy but this doesn't cover all the potential platform positions
+// The issue arrises with diagonals
+// Look in IsStraightPathFree for how to handle diagonals
+TArray<FVector> UGeometryRealisationComponent::GetPlayerNodesAtPosition(FVector CenterBottom, FVector FacingDirection, bool onPlatform)
+{
+	TArray<FVector> returnValues;
+
+	FVector BottomLeft = CenterBottom - ((ActionGrammarsRef->GetPlayersValues().Width / 2.0f) * 100.0f);
+	FVector distanceVector;
+
+	// Guarantee new vectors within
+	for (float width = 0; width < ActionGrammarsRef->GetPlayersValues().Width; width += 1.0f) {
+		for (float height = 0; height < ActionGrammarsRef->GetPlayersValues().Height; height += 1.0f) {
+			distanceVector = FacingDirection.RightVector * width * 100.0f;
+			distanceVector += BottomLeft + FVector(0.0f, height * 100.0f, 0.0f);
+			returnValues.Add(GetNodeAtPosition(distanceVector).Position);
 		}
 	}
+
+	for (float width = 0; width < ActionGrammarsRef->GetPlayersValues().Width; width += 1.0f) {
+		distanceVector = FacingDirection.RightVector * width * 100.0f;
+		distanceVector += BottomLeft + FVector(0.0f, ActionGrammarsRef->GetPlayersValues().Height * 100.0f, 0.0f);
+		if (!returnValues.Contains(GetNodeAtPosition(distanceVector).Position)) {
+			returnValues.Add(GetNodeAtPosition(distanceVector).Position);
+		}
+	}
+
+	for (float height = 0; height < ActionGrammarsRef->GetPlayersValues().Height; height += 1.0f) {
+		distanceVector = FacingDirection.RightVector * ActionGrammarsRef->GetPlayersValues().Width * 100.0f;
+		distanceVector += BottomLeft + FVector(0.0f, height * 100.0f, 0.0f);
+		if (!returnValues.Contains(GetNodeAtPosition(distanceVector).Position)) {
+			returnValues.Add(GetNodeAtPosition(distanceVector).Position);
+		}
+	}
+
+	if (onPlatform) {
+		returnValues.Add(GetNodeAtPosition(BottomLeft - FVector(0.0f, 0.0f, NodeDimensions.Z)).Position);
+		returnValues.Add(GetNodeAtPosition(BottomLeft - FVector(0.0f, 0.0f, NodeDimensions.Z) + (FacingDirection.RightVector * NodeDimensions.X)).Position);
+	}
+
+	return returnValues;
+}
+
+bool UGeometryRealisationComponent::IsNodeOpen(FVector NodePosition)
+{
+	FChunkStruct CurrentChunk = GetChunkFromGrid(NodePosition);
+
+	FNodeStruct CurrentNode = CurrentChunk.GetNodeFromPosition(NodePosition);
+
+	return CurrentNode.NodeType == ENodeType::Open;
+}
+
+bool UGeometryRealisationComponent::IsStraightPathFree(FVector StartPosition, FVector TravelVector)
+{
+	FVector currentNodePosition = GetNodeAtPosition(StartPosition).Position;
+	FVector currentTraversalPosition = StartPosition;
+	FVector centerOfNodeToPosition = currentTraversalPosition - currentNodePosition;
+	float totalDistanceTraveled = 0.0f;
+	FVector nodeTraversalRemaining;
+
+	FVector nodeTraversalPercentagesRemaining;
+	FVector traversalMovementTraveled;
+
+	float distanceToTravel = sqrt(TravelVector.X * TravelVector.X
+		+ TravelVector.Y * TravelVector.Y
+		+ TravelVector.Z * TravelVector.Z);
+	FVector MovementDirection = TravelVector.GetSafeNormal();
+	if (MovementDirection == FVector::ZeroVector) {
+		return false;
+	}
+
+	while (totalDistanceTraveled < distanceToTravel) {
+		if (!IsNodeOpen(currentNodePosition)) {
+			return false;
+		}
+
+		nodeTraversalRemaining = FVector(
+			(NodeDimensions.X / 2.0f) - (centerOfNodeToPosition.X * (MovementDirection.X >= 0 ? 1 : -1)),
+			(NodeDimensions.Y / 2.0f) - (centerOfNodeToPosition.Y * (MovementDirection.Y >= 0 ? 1 : -1)),
+			(NodeDimensions.Z / 2.0f) - (centerOfNodeToPosition.Z * (MovementDirection.Z >= 0 ? 1 : -1))
+		);
+
+		if (MovementDirection.X != 0) {
+			nodeTraversalPercentagesRemaining.X = 
+				(nodeTraversalRemaining.X * nodeTraversalRemaining.X) / (MovementDirection.X * MovementDirection.X);
+		}
+		else {
+			nodeTraversalPercentagesRemaining.X = FLT_MAX;
+		}
+
+		if (MovementDirection.Y != 0) {
+			nodeTraversalPercentagesRemaining.Y =
+				(nodeTraversalRemaining.Y * nodeTraversalRemaining.Y) / (MovementDirection.Y * MovementDirection.Y);
+		}
+		else {
+			nodeTraversalPercentagesRemaining.Y = FLT_MAX;
+		}
+
+		if (MovementDirection.Z != 0) {
+			nodeTraversalPercentagesRemaining.Z =
+				(nodeTraversalRemaining.Z * nodeTraversalRemaining.Z) / (MovementDirection.Z * MovementDirection.Z);
+		}
+		else {
+			nodeTraversalPercentagesRemaining.Z = FLT_MAX;
+		}
+
+		if (nodeTraversalPercentagesRemaining.X <= nodeTraversalPercentagesRemaining.Y
+			&& nodeTraversalPercentagesRemaining.X <= nodeTraversalPercentagesRemaining.Z) {
+
+			currentNodePosition = GetNodeAtPosition(
+				currentNodePosition + (NodeDimensions.X * (MovementDirection.X >= 0 ? 1 : -1))).Position;
+
+			traversalMovementTraveled = MovementDirection * nodeTraversalPercentagesRemaining.X;
+		}
+		else if (nodeTraversalPercentagesRemaining.Y <= nodeTraversalPercentagesRemaining.Z) {
+			currentNodePosition = GetNodeAtPosition(
+				currentNodePosition + (NodeDimensions.Y * (MovementDirection.Y >= 0 ? 1 : -1))).Position;
+
+			traversalMovementTraveled = MovementDirection * nodeTraversalPercentagesRemaining.Y;
+		}
+		else {
+			currentNodePosition = GetNodeAtPosition(
+				currentNodePosition + (NodeDimensions.Z * (MovementDirection.Z >= 0 ? 1 : -1))).Position;
+
+			traversalMovementTraveled = MovementDirection * nodeTraversalPercentagesRemaining.Z;
+		}
+
+		currentTraversalPosition += traversalMovementTraveled;
+		// Magnitude calculation
+		totalDistanceTraveled += sqrt(traversalMovementTraveled.X * traversalMovementTraveled.X
+			+ traversalMovementTraveled.Y * traversalMovementTraveled.Y
+			+ traversalMovementTraveled.Z * traversalMovementTraveled.Z);
+	}
+
+	return true;
+}
+
+float UGeometryRealisationComponent::GenerateLevel()
+{
+	if (!StandardPlatform) {
+		UE_LOG(LogTemp, Warning, TEXT("No Base Platform"));
+		return 0.0f;
+	}
+
+	RemoveGeneratedLevel();
+	float defaultPlatformUnitWidth = ActionGrammarsRef->GetPlatformValues().RegularPlatformDefaultSize.Y;
+
+	float lowestPosition = 0.0f;
+
+	for (int i = 0; i < GeneratedPlatforms.Num(); i++) {
+		FActorSpawnParameters spawnParams;
+		spawnParams.Owner = GetOwner();
+
+		FVector platformStartPosition = GeneratedPlatforms[i].startPosition;
+		FVector platformEndPosition = GeneratedPlatforms[i].endPosition;
+		FRotator platformRotation = GeneratedPlatforms[i].rotation;
+
+		lowestPosition = fmin(lowestPosition, fmin(platformStartPosition.Z, platformEndPosition.Z));
+
+		AActor* spawnedPlatform = GetWorld()->SpawnActor<AActor>(
+			StandardPlatform,
+			(platformEndPosition + platformStartPosition) / 2.0f,
+			platformRotation,
+			spawnParams);
+
+		spawnedPlatform->AttachToActor(
+			GetOwner(),
+			FAttachmentTransformRules::KeepRelativeTransform
+		);
+
+		FVector distance = platformEndPosition - platformStartPosition;
+		float distanceMagnitude = sqrt(
+			(distance.X * distance.X)
+			+ (distance.Y * distance.Y)
+			+ (distance.Z * distance.Z)
+		);
+
+		spawnedPlatform->SetActorScale3D(FVector(
+			1.0f,
+			distanceMagnitude / defaultPlatformUnitWidth,
+			1.0f));
+
+		GeneratedPlatforms[i].platformRef = spawnedPlatform;
+	}
+
+	return lowestPosition;
 }
 
 void UGeometryRealisationComponent::RemoveGeneratedLevel()
 {
-	for (AActor* Platform : GeneratedPlatforms) {
-		Platform->Destroy();
+	/*for (FGenerationPlatform Platform : GeneratedPlatforms) {
+		if (!Platform.platformRef) {
+			continue;
+		}
+		Platform.platformRef->Destroy();
 	}
 
-	GeneratedPlatforms.Empty();
+	GeneratedPlatforms.Empty();*/
 }
 
 void UGeometryRealisationComponent::ClearGrid()
@@ -186,7 +479,7 @@ void UGeometryRealisationComponent::ClearGrid()
 
 void UGeometryRealisationComponent::SpawnPlatformAtPosition(FVector Position)
 {
-	FActorSpawnParameters spawnParams;
+	/*FActorSpawnParameters spawnParams;
 	spawnParams.Owner = GetOwner();
 	AActor* spawnedPlatform = GetWorld()->SpawnActor<AActor>(
 		StandardPlatform,
@@ -199,7 +492,7 @@ void UGeometryRealisationComponent::SpawnPlatformAtPosition(FVector Position)
 		FAttachmentTransformRules::KeepRelativeTransform
 	);
 
-	GeneratedPlatforms.Add(spawnedPlatform);
+	GeneratedPlatforms.Add(spawnedPlatform);*/
 }
 
 

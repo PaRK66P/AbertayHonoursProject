@@ -46,32 +46,32 @@ public:
 	URhythmGenerationComponent();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float BeatDensity;
+	float BeatDensity = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float BeatOccurence;
+	float BeatOccurence = 2.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<FGeneratedBeatValues> GeneratedRhythmGroup;
 
 	// Temp - Would be better to have a list of each action type that the dev inputs each params
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float JumpActionWeighting;
+	float JumpActionWeighting = 40.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float JumpActionDurationMin;
+	float JumpActionDurationMin = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float JumpActionDurationMax;
+	float JumpActionDurationMax = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MoveActionWeighting;
+	float MoveActionWeighting = 60.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MoveActionDurationMin;
+	float MoveActionDurationMin = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MoveActionDurationMax;
+	float MoveActionDurationMax = 6.0f;
 
 	
 

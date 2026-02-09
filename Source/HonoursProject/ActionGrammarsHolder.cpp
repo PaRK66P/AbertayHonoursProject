@@ -14,27 +14,49 @@ UActionGrammarsHolder::UActionGrammarsHolder()
 	// Default Grammar setup
 	FActionGrammerStruct tempStruct;
 	MoveGrammars.Add(EPathSectionType::Move, tempStruct);
+	MoveGrammars[EPathSectionType::Move].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Flat, tempStruct);
+	MoveGrammars[EPathSectionType::Flat].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped_Steep, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped_Steep].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped_Gradual, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped_Gradual].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped_Steep_Up, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped_Steep_Up].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped_Steep_Down, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped_Steep_Down].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped_Gradual_Up, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped_Gradual_Up].ChanceOfOccuring = 1.0f;
 	MoveGrammars.Add(EPathSectionType::Sloped_Gradual_Down, tempStruct);
+	MoveGrammars[EPathSectionType::Sloped_Gradual_Down].ChanceOfOccuring = 1.0f;
 
 	JumpGrammars.Add(EPathSectionType::Jump, tempStruct);
+	JumpGrammars[EPathSectionType::Jump].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_NoGap, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_NoGap].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Forward, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Forward].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Up, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Up].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Down, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Down].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Up_Long, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Up_Long].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Up_Medium, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Up_Medium].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Up_Short, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Up_Short].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Down_Long, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Down_Long].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Down_Medium, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Down_Medium].ChanceOfOccuring = 1.0f;
 	JumpGrammars.Add(EPathSectionType::Jump_Gap_Down_Short, tempStruct);
+	JumpGrammars[EPathSectionType::Jump_Gap_Down_Short].ChanceOfOccuring = 1.0f;
+
 
 }
 

@@ -8,6 +8,7 @@
 #include "RhythmGenerationComponent.h"
 #include "ActionGrammarsHolder.h"
 
+#include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -26,6 +27,7 @@ void UPCG_LevelCreator::GenerateLevel(int NumberOfSections)
 
 	FVector SectionStartPosition = TempOrigin;
 	FVector MessageStartPosition;
+	FVector FacingDirection = FVector::ForwardVector;
 
 	UE_LOG(LogTemp, Warning, TEXT("Started Generating"));
 
@@ -53,14 +55,14 @@ void UPCG_LevelCreator::GenerateLevel(int NumberOfSections)
 		}
 
 		MessageStartPosition = SectionStartPosition;
-		SectionStartPosition = GeometryRealisation->AddPathToGrid(pathGenerated, SectionStartPosition);
+		SectionStartPosition = GeometryRealisation->AddPathToGrid(pathGenerated, SectionStartPosition, FacingDirection);
 		UE_LOG(LogTemp, Log, TEXT("Geometry realised"));
 		UE_LOG(LogTemp, Log, TEXT("Geometry from (%f, %f, %f) to (%f, %f, %f)"),
 			MessageStartPosition.X, MessageStartPosition.Y, MessageStartPosition.Z,
 			SectionStartPosition.X, SectionStartPosition.Y, SectionStartPosition.Z);
 	}
 
-	GeometryRealisation->GenerateLevel();
+	lowestZPosition = fmin(lowestZPosition, GeometryRealisation->GenerateLevel() - 100.0f);
 	UE_LOG(LogTemp, Warning, TEXT("Level Generated"));
 	
 }
@@ -76,7 +78,6 @@ void UPCG_LevelCreator::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("No Path"));
 	}
 	GeometryRealisation = GetOwner()->FindComponentByClass<UGeometryRealisationComponent>();
-	GeometryRealisation->InitialiseComponent();
 	if (!GeometryRealisation) {
 		UE_LOG(LogTemp, Warning, TEXT("No Geometry"));
 	}
@@ -94,6 +95,7 @@ void UPCG_LevelCreator::BeginPlay()
 	}
 
 	PathRealisation->SetActionGrammarReference(ActionGrammarsHolder);
+	GeometryRealisation->InitialiseComponent(ActionGrammarsHolder);
 
 	GenerateLevel(LevelSections);
 
@@ -105,6 +107,13 @@ void UPCG_LevelCreator::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	
+	ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+
+	if (PlayerCharacter)
+	{
+		if (PlayerCharacter->GetActorLocation().Z < lowestZPosition) {
+			PlayerCharacter->SetActorLocation(PlayerStart);
+		}
+	}
 }
 

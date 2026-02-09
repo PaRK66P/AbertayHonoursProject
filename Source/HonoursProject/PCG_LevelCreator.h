@@ -24,7 +24,10 @@ public:
 	bool isDisplayed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
-	int LevelSections;
+	int LevelSections = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
+	FVector PlayerStart;
 
 
 	UFUNCTION()
@@ -42,6 +45,9 @@ protected:
 	URhythmGenerationComponent* RhythmGeneration;
 	UPROPERTY()
 	UActionGrammarsHolder* ActionGrammarsHolder;
+
+
+	float lowestZPosition = -100.0f;
 
 public:	
 	// Called every frame

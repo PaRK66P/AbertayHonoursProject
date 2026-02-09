@@ -81,7 +81,7 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 
 		ValuesToVisit.RemoveAt(indexToRemoveAt);
 
-		ExploreCurrentAction(ValuesToVisit, lowestBeatStartTime, currentBeat, isMoving, currentDirection, currentPosition, currentSpeed, actionEndList);
+		ExploreCurrentAction(ValuesToVisit, lowestBeatStartTime, currentBeat, isMoving, actionEndList);
 
 		if (!ValuesToVisit.IsEmpty()) {
 			continue;
@@ -95,7 +95,7 @@ TArray<FPathSection> UPathRealisation::GeneratePathFromRhythmGroup(TArray<FGener
 
 // So the values by address were just one or two at the start
 // But at this point there's a lot so maybe consider making them member variables of the class
-void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool& isMoving, FVector& CurrentDirection, FVector& CurrentPosition, float& CurrentSpeed, TArray<FActionEndValues>& ActionEndList)
+void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool& isMoving, TArray<FActionEndValues>& ActionEndList)
 {
 	FPathSection newSection;
 	bool hasFurtherActionBeenExplored = false;
@@ -114,8 +114,6 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 	float currentActionEndTime = actionExploreStart + actionBeingExplored.Duration;
 	float lowestFurtherBeatStartTime = currentActionEndTime;
 	FGeneratedBeatValues furtherActionToExplore;
-
-	FVector currentActionTrueStartPosition = CurrentPosition;
 
 	bool isThereFurtherActionToExplore = true;
 	bool isThereActionToEnd = false;
@@ -183,7 +181,6 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 			{
 			case EActionType::Move:
 				isMoving = false;
-				CurrentSpeed = 0.0f;
 				break;
 			case EActionType::Jump:
 				break; // Nothing changes
@@ -205,11 +202,7 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 		switch (actionBeingExplored.ActionType)
 		{
 		case EActionType::Move:
-
-			UE_LOG(LogTemp, Log, TEXT("Move action %f %f %f"),
-				furtherActionToExplore.StartTime, currentStartTime, actionBeingExplored.StartTime);
-			CurrentPosition = AddMoveAction(CurrentPosition, CurrentDirection,
-				furtherActionToExplore.StartTime - currentStartTime);
+			AddMoveAction(furtherActionToExplore.StartTime - currentStartTime);
 			currentStartTime = furtherActionToExplore.StartTime;
 
 			// Check if action ends during the next one
@@ -227,9 +220,7 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 			ExploreCurrentAction(ValuesToVisit,
 				furtherActionToExplore.StartTime,
 				furtherActionToExplore,
-				isMoving, CurrentDirection,
-				CurrentPosition,
-				CurrentSpeed,
+				isMoving,
 				ActionEndList);
 
 			break;
@@ -240,7 +231,7 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 				break;
 			}
 
-			CurrentPosition = AddJumpAction(CurrentPosition, CurrentDirection);
+			AddJumpAction();
 			// Jumps have a fixed time value
 			currentStartTime = actionBeingExplored.StartTime + 1.0f;
 
@@ -253,9 +244,7 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 				ExploreCurrentAction(ValuesToVisit,
 					furtherActionToExplore.StartTime,
 					furtherActionToExplore,
-					isMoving, CurrentDirection,
-					CurrentPosition,
-					CurrentSpeed,
+					isMoving,
 					ActionEndList);
 
 				break;
@@ -280,14 +269,11 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 	switch (actionBeingExplored.ActionType)
 	{
 	case EActionType::Move:
-		UE_LOG(LogTemp, Log, TEXT("Move action %f %f %f"),
-			actionBeingExplored.Duration, currentStartTime, actionBeingExplored.StartTime);
-		CurrentPosition = AddMoveAction(CurrentPosition, CurrentDirection,
-			actionBeingExplored.Duration - (currentStartTime - actionBeingExplored.StartTime));
+		AddMoveAction(actionBeingExplored.Duration - (currentStartTime - actionBeingExplored.StartTime));
 		currentStartTime = actionBeingExplored.Duration + actionBeingExplored.StartTime;
 		break;
 	case EActionType::Jump:
-		CurrentPosition = AddJumpAction(CurrentPosition, CurrentDirection);
+		AddJumpAction();
 		// Jumps have a fixed time value
 		currentStartTime = actionBeingExplored.StartTime + 1.0f;
 		break;
@@ -296,71 +282,14 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 	}
 }
 
-FVector UPathRealisation::DetermineArcEndpoint(FVector StartPosition, float Duration, float CurrentSpeed, FVector CurrentDirection)
+void UPathRealisation::AddMoveAction(float duration)
 {
-	const UCharacterMovementComponent* moveComponent = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0)->GetCharacterMovement();
-
-	FVector arcPosition = StartPosition;
-
-	const float gravityZ = moveComponent->GetGravityZ();
-
-	arcPosition += CurrentDirection * CurrentSpeed * Duration;
-
-	// Ballistic arc formula for vertical movement
-	float verticalDisplacement = (moveComponent->JumpZVelocity * Duration) +
-		(0.5f * gravityZ * Duration * Duration);
-
-	arcPosition.Z += verticalDisplacement;
-
-	return arcPosition;
-}
-
-// This was not needed (D:)
-// Current speed is added for future implementation that might require it (IT WAS NEEDED :D)
-FVector UPathRealisation::GetPositionFromFlatMoving(FVector StartPosition, float& CurrentSpeed, float Duration, FVector Direction)
-{
-	if (Direction.IsNearlyZero()) { return FVector::ZeroVector; }
-		
-	const UCharacterMovementComponent* movementComponent = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0)->GetCharacterMovement();
-
-	float maxSpeed = movementComponent->MaxWalkSpeed;
-	float maxAcceleration = movementComponent->GetMaxAcceleration();
-	float friction = movementComponent->GroundFriction;
-	float braking = movementComponent->BrakingDecelerationWalking;
-
-	const float deltaTime = 0.016f; // 60 FPS
-	FVector totalMovement = FVector::ZeroVector;
-
-	FVector normalisedDirection = Direction.GetSafeNormal(); // Ensure normalized
-
-	// Simulate movement frame by frame
-	for (float time = 0.f; time < Duration; time += deltaTime)
-	{
-		CurrentSpeed += movementComponent->GetMaxAcceleration() * deltaTime;
-		CurrentSpeed = FMath::Min(CurrentSpeed, movementComponent->MaxWalkSpeed);
-
-		// Apply friction
-		CurrentSpeed *= FMath::Clamp(1.f - movementComponent->GroundFriction * deltaTime, 0.f, 1.f);
-
-		// Move
-		totalMovement += normalisedDirection * CurrentSpeed * deltaTime;
-	}
-
-	return StartPosition + totalMovement;
-}
-
-FVector UPathRealisation::AddMoveAction(FVector startingPosition, FVector facingDirection, float duration)
-{
-
-	UE_LOG(LogTemp, Log, TEXT("Facing %f %f %f"),
-		facingDirection.X, facingDirection.Y, facingDirection.Z);
 	FPathSection newSection;
 	newSection.SectionType = EPathSectionType::Move;
 	newSection.IsMove = true;
-	newSection.StartPosition = startingPosition;
 
 	// Create speed variable somewhere [speed = 5m/s, 1m == 100 Unreal Units]
-	FVector distanceVector = 500 * facingDirection * duration;
+	FVector distanceVector = FVector(1.0f, 0.0f, 0.0f) * 500.0f * duration;
 
 	float actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Flat)
 		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped);
@@ -368,14 +297,9 @@ FVector UPathRealisation::AddMoveAction(FVector startingPosition, FVector facing
 	newSection.IsSloped = FMath::FRandRange(0.0f, actionSectionChanceTotal)
 		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Flat);
 	if (!(newSection.IsSloped)) {
-		newSection.EndPosition = distanceVector + startingPosition;
+		newSection.TravelVector = distanceVector;
 
 		CurrentPath.Add(newSection);
-		UE_LOG(LogTemp, Log, TEXT("Moving from (%f, %f, %f) to (%f, %f, %f)"),
-			startingPosition.X, startingPosition.Y, startingPosition.Z,
-			newSection.EndPosition.X, newSection.EndPosition.Y, newSection.EndPosition.Z);
-
-		return newSection.EndPosition;
 	}
 
 	actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep)
@@ -406,28 +330,17 @@ FVector UPathRealisation::AddMoveAction(FVector startingPosition, FVector facing
 			-1.0f
 			: 1.0f);
 
-	newSection.EndPosition = distanceVector.RotateAngleAxis(movementAngle,
-		FVector::CrossProduct(FVector::UpVector, distanceVector).GetSafeNormal())
-		+ startingPosition;
+	newSection.TravelVector = distanceVector.RotateAngleAxis(movementAngle,
+		FVector::CrossProduct(FVector::UpVector, distanceVector).GetSafeNormal());
 
 	CurrentPath.Add(newSection);
-
-	UE_LOG(LogTemp, Log, TEXT("Moving from (%f, %f, %f) to (%f, %f, %f)"),
-		startingPosition.X, startingPosition.Y, startingPosition.Z,
-		newSection.EndPosition.X, newSection.EndPosition.Y, newSection.EndPosition.Z);
-
-	return newSection.EndPosition;
 }
 
-FVector UPathRealisation::AddJumpAction(FVector startingPosition, FVector facingDirection)
+void UPathRealisation::AddJumpAction()
 {
-	UE_LOG(LogTemp, Log, TEXT("Facing %f %f %f"),
-		facingDirection.X, facingDirection.Y, facingDirection.Z);
-
 	FPathSection newSection;
 	newSection.SectionType = EPathSectionType::Jump;
 	newSection.IsJump = true;
-	newSection.StartPosition = startingPosition;
 
 	float actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap)
 		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap);
@@ -466,32 +379,37 @@ FVector UPathRealisation::AddJumpAction(FVector startingPosition, FVector facing
 	// Why is this section hardcoded?
 	// Because I didn't want a triple indented 3 split per indent if statement web that I couldn't understand
 	// PLEASE GET THE BIT FLAGS IMPLEMENTED
-	actionSectionChanceTotal = 0.0f;
-	newSection.VerticalSize = 1; // Fixed for now
+	actionSectionChanceCurrent = FMath::FRandRange(0.0f, 6.0f);
+
+	if (actionSectionChanceCurrent <= 3.0f) {
+		newSection.VerticalSize = 0;
+	}
+	else if (actionSectionChanceCurrent <= 5.0f) {
+		newSection.VerticalSize = 1;
+	}
+	else {
+		newSection.VerticalSize = 2;
+	}
+
 	FVector distanceVector = FVector::ZeroVector;
 	distanceVector += newSection.IsGap ?
-		facingDirection * 400.0f
+		FVector(1.0f, 0.0f, 0.0f) * 400.0f
 		:
-		facingDirection * 100.0f;
+		FVector(1.0f, 0.0f, 0.0f) * 100.0f;
+
 	switch (newSection.VerticalDirection) {
 	case 0: // Up
-		distanceVector.Z += 200.0f;
+		distanceVector.Z += 210.0f/* / (1 + newSection.VerticalSize)*/;
 		break;
 	case 2:
-		distanceVector.Z -= 200.0f;
+		distanceVector.Z -= 400.0f /*/ (1 + newSection.VerticalSize)*/;
 		break;
 	default:
 		break;
 	}
 
-	newSection.EndPosition = startingPosition + distanceVector;
+	newSection.TravelVector = distanceVector;
 
 	CurrentPath.Add(newSection);
-
-	UE_LOG(LogTemp, Log, TEXT("Jumping from (%f, %f, %f) to (%f, %f, %f)"), 
-		startingPosition.X, startingPosition.Y, startingPosition.Z,
-		newSection.EndPosition.X, newSection.EndPosition.Y, newSection.EndPosition.Z);
-
-	return newSection.EndPosition;
 }
 

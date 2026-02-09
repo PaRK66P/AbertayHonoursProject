@@ -78,17 +78,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int VerticalSize; // 0 = Short, 1 = Medium, 2 = Long
 
+	// The distance traveled from the start to end in direction (1, 0, 0)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FVector StartPosition;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FVector EndPosition;
+	FVector TravelVector;
 
 	bool operator==(const FPathSection& Other) const
 	{
 		return SectionType == Other.SectionType
-			&& StartPosition == Other.StartPosition
-			&& EndPosition == Other.EndPosition;
+			&& TravelVector == Other.TravelVector;
 	}
 };
 
@@ -116,15 +113,10 @@ public:
 
 	TArray<FPathSection> GeneratePathFromRhythmGroup(TArray<FGeneratedBeatValues> RhythmGroup, FVector Origin, float RhythmGroupDuration, FVector StartingDirection);
 
-	void ExploreCurrentAction(TArray<FGeneratedBeatValues> &ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool &isMoving, FVector & CurrentDirection, FVector & CurrentPosition, float & CurrentSpeed, TArray<FActionEndValues> & ActionEndList);
+	void ExploreCurrentAction(TArray<FGeneratedBeatValues> &ValuesToVisit, float actionExploreStart, FGeneratedBeatValues actionBeingExplored, bool &isMoving, TArray<FActionEndValues> & ActionEndList);
 
-	FVector DetermineArcEndpoint(FVector StartPosition, float Duration, float CurrentSpeed, FVector CurrentDirection);
-
-	// Physics Calculations
-	FVector GetPositionFromFlatMoving(FVector StartPosition, float & CurrentSpeed, float Duration, FVector Direction);
-
-	FVector AddMoveAction(FVector startingPosition, FVector facingDirection, float duration);
-	FVector AddJumpAction(FVector startingPosition, FVector facingDirection);
+	void AddMoveAction(float duration);
+	void AddJumpAction();
 
 
 };
