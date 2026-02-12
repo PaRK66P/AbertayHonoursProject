@@ -8,7 +8,7 @@
 #include "PathRealisation.generated.h"
 
 enum class EActionType : uint8;
-enum class EPathSectionType : uint8;
+enum class ECollectiblePlacementType : uint8;
 struct FGeneratedBeatValues;
 class UActionGrammarsHolder;
 
@@ -58,9 +58,6 @@ struct FPathSection
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	EPathSectionType SectionType;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool IsMove;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	bool IsSloped;
@@ -76,15 +73,17 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int VerticalDirection; // 0 = Up, 1 = Forward, 2 = Down
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	int VerticalSize; // 0 = Short, 1 = Medium, 2 = Long
+	bool IsLargeJump;
 
 	// The distance traveled from the start to end in direction (1, 0, 0)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FVector TravelVector;
+	ECollectiblePlacementType collectiblePlacementType;
 
 	bool operator==(const FPathSection& Other) const
 	{
-		return SectionType == Other.SectionType
+		return IsMove == Other.IsMove
+			&& IsJump == Other.IsJump
 			&& TravelVector == Other.TravelVector;
 	}
 };

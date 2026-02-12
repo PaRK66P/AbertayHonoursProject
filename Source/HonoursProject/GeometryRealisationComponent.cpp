@@ -58,6 +58,8 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 	float rotationAngle;
 	FVector platformRotation;
 
+	FGenerationCollectables generatedCollectable;
+
 	generatedPlatform.startPosition = currentPosition;
 	currentPosition += FVector(
 		FacingDirection.X,
@@ -67,10 +69,14 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 	generatedPlatform.rotation = FacingDirection.Rotation();
 	GeneratedPlatforms.Add(generatedPlatform);
 
+	UE_LOG(LogTemp, Log,
+		TEXT("Geometry Realising"));
+
 	for (FPathSection PathSection : Path) {
-		switch (PathSection.SectionType)
+		if (PathSection.IsMove)
 		{
-		case EPathSectionType::Move:
+			UE_LOG(LogTemp, Log,
+				TEXT("Move"));
 			// ATTEMPT TURN DIRECTION
 			generatedPlatform.startPosition = currentPosition;
 
@@ -85,26 +91,17 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 				+ FVector(0.0f, 0.0f, PathSection.TravelVector.Z);
 
 			generatedPlatform.endPosition = currentPosition;
-			UE_LOG(LogTemp, Log, TEXT("Facing Direction: (%f, %f, %f)"), 
-				FacingDirection.X, FacingDirection.Y, FacingDirection.Z);
 			platformRotation = FVector(FacingDirection.X, FacingDirection.Y, PathSection.TravelVector.GetSafeNormal().Z);
-			UE_LOG(LogTemp, Log, TEXT("PreRotation: (%f, %f, %f)"),
-				platformRotation.X, platformRotation.Y, platformRotation.Z);
 			platformRotation = platformRotation.GetSafeNormal();
-			UE_LOG(LogTemp, Log, TEXT("PostRotation: (%f, %f, %f)"),
-				platformRotation.X, platformRotation.Y, platformRotation.Z);
 			generatedPlatform.rotation = platformRotation.Rotation();
-			UE_LOG(LogTemp, Log, TEXT("Rotator: (%f, %f, %f)"),
-				generatedPlatform.rotation.Pitch, generatedPlatform.rotation.Roll, generatedPlatform.rotation.Yaw);
 			GeneratedPlatforms.Add(generatedPlatform);
-			
+
 			// ADD PATH SECTION
 			DrawDebugLine(GetWorld(), generatedPlatform.startPosition, generatedPlatform.endPosition, FColor::Red, true, -1.0f, (uint8)0U, 10.0f);
-
-
-			break;
-		case EPathSectionType::Jump: // Jumping doesn't add a platform, just moves the positions
-
+		}
+		else if (PathSection.IsJump){
+			UE_LOG(LogTemp, Log,
+				TEXT("Jump"));
 			rotationAngle = GenerateTurnAngle();
 
 			FacingDirection = FacingDirection.GetSafeNormal().RotateAngleAxis(rotationAngle, FVector::UpVector);
@@ -115,21 +112,80 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 				0.0f) * PathSection.TravelVector.X
 				+ FVector(0.0f, 0.0f, PathSection.TravelVector.Z);
 
-			DrawDebugLine(GetWorld(), generatedPlatform.startPosition, generatedPlatform.endPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
+			DrawDebugLine(GetWorld(), generatedPlatform.endPosition, currentPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
+			
+		}
+
+		int iterations;
+		float travelPercentage;
+		// Collectable generation
+		switch (PathSection.collectiblePlacementType)
+		{
+		case ECollectiblePlacementType::None:
+			break;
+		case ECollectiblePlacementType::AboveHorizontalPositions:
+			iterations = PathSection.TravelVector.X / ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance;
+			for (float i = 1; i <= iterations; i += 1.0f) {
+				travelPercentage = (i * ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance)
+					/ PathSection.TravelVector.X;
+				UE_LOG(LogTemp, Log,
+					TEXT("Percentage %f"), travelPercentage);
+
+				generatedCollectable.position = generatedPlatform.startPosition +
+					FVector(
+						FacingDirection.X,
+						FacingDirection.Y,
+						0.0f)
+						* ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance 
+						* i
+					+ FVector(
+						0.0f,
+						0.0f,
+						FMath::Lerp(
+							generatedPlatform.startPosition.Z, 
+							generatedPlatform.endPosition.Z, 
+							travelPercentage)
+							- generatedPlatform.startPosition.Z
+						);
+				GeneratedCollectables.Add(generatedCollectable);
+			}
+			break;
+		case ECollectiblePlacementType::UpStream:
+
+			break;
+		case ECollectiblePlacementType::UpArc:
+
+			break;
+		case ECollectiblePlacementType::StraightArc:
+
+			break;
+		case ECollectiblePlacementType::DownArc:
+
 			break;
 		default:
 			break;
 		}
 
-		generatedPlatform.startPosition = currentPosition;
-		currentPosition += FVector(
-			FacingDirection.X,
-			FacingDirection.Y,
-			0.0f) * 160.0f;
-		generatedPlatform.endPosition = currentPosition;
-		generatedPlatform.rotation = FacingDirection.Rotation();
-		GeneratedPlatforms.Add(generatedPlatform);
+		if (IncludeSafetyPlatforms) {
+			generatedPlatform.startPosition = currentPosition;
+			currentPosition += FVector(
+				FacingDirection.X,
+				FacingDirection.Y,
+				0.0f) * 160.0f;
+			generatedPlatform.endPosition = currentPosition;
+			generatedPlatform.rotation = FacingDirection.Rotation();
+			GeneratedPlatforms.Add(generatedPlatform);
+		}
 	}
+
+	generatedPlatform.startPosition = currentPosition;
+	currentPosition += FVector(
+		FacingDirection.X,
+		FacingDirection.Y,
+		0.0f) * 160.0f;
+	generatedPlatform.endPosition = currentPosition;
+	generatedPlatform.rotation = FacingDirection.Rotation();
+	GeneratedPlatforms.Add(generatedPlatform);
 
 	return currentPosition;
 }
@@ -415,6 +471,10 @@ float UGeometryRealisationComponent::GenerateLevel()
 		UE_LOG(LogTemp, Warning, TEXT("No Base Platform"));
 		return 0.0f;
 	}
+	if (!StandardCollectable) {
+		UE_LOG(LogTemp, Warning, TEXT("No Collectable"));
+		return 0.0f;
+	}
 
 	RemoveGeneratedLevel();
 	float defaultPlatformUnitWidth = ActionGrammarsRef->GetPlatformValues().RegularPlatformDefaultSize.Y;
@@ -455,6 +515,26 @@ float UGeometryRealisationComponent::GenerateLevel()
 			1.0f));
 
 		GeneratedPlatforms[i].platformRef = spawnedPlatform;
+	}
+
+	for (int i = 0; i < GeneratedCollectables.Num(); i++) {
+		FActorSpawnParameters spawnParams;
+		spawnParams.Owner = GetOwner();
+
+		FVector collectableSpawnPosition = GeneratedCollectables[i].position;
+
+		AActor* spawnedCollectable = GetWorld()->SpawnActor<AActor>(
+			StandardCollectable,
+			collectableSpawnPosition,
+			FRotator::ZeroRotator,
+			spawnParams);
+
+		spawnedCollectable->AttachToActor(
+			GetOwner(),
+			FAttachmentTransformRules::KeepRelativeTransform
+		);
+
+		GeneratedCollectables[i].collectableRef = spawnedCollectable;
 	}
 
 	return lowestPosition;

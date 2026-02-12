@@ -50,6 +50,20 @@ public:
 	AActor* platformRef;
 };
 
+USTRUCT(BlueprintType)
+struct FGenerationCollectables
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	UPROPERTY()
+	FVector position;
+	UPROPERTY()
+	FRotator rotation;
+	UPROPERTY()
+	AActor* collectableRef;
+};
+
 
 USTRUCT(BlueprintType)
 struct FChunkStruct
@@ -136,8 +150,14 @@ public:
 	// Sets default values for this component's properties
 	UGeometryRealisationComponent();
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	bool IncludeSafetyPlatforms = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Environment")
 	TSubclassOf<AActor> StandardPlatform;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	TSubclassOf<AActor> StandardCollectable;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
 	FVector GridOrigin;
@@ -150,6 +170,9 @@ public:
 
 	UPROPERTY()
 	TArray<FGenerationPlatform> GeneratedPlatforms;
+
+	UPROPERTY()
+	TArray<FGenerationCollectables> GeneratedCollectables;
 
 protected:
 	// Called when the game starts

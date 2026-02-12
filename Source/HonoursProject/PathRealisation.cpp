@@ -285,46 +285,34 @@ void UPathRealisation::ExploreCurrentAction(TArray<FGeneratedBeatValues>& Values
 void UPathRealisation::AddMoveAction(float duration)
 {
 	FPathSection newSection;
-	newSection.SectionType = EPathSectionType::Move;
 	newSection.IsMove = true;
+	newSection.IsJump = false;
+	newSection.collectiblePlacementType = ECollectiblePlacementType::AboveHorizontalPositions;
 
 	// Create speed variable somewhere [speed = 5m/s, 1m == 100 Unreal Units]
 	FVector distanceVector = FVector(1.0f, 0.0f, 0.0f) * 500.0f * duration;
 
-	float actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Flat)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped);
+	float actionSectionChanceTotal = 1.0f;
 
 	newSection.IsSloped = FMath::FRandRange(0.0f, actionSectionChanceTotal)
-		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Flat);
+		<= actionGrammarsReference->GetMovementValues().SlopedChance;
 	if (!(newSection.IsSloped)) {
 		newSection.TravelVector = distanceVector;
 
 		CurrentPath.Add(newSection);
 	}
 
-	actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Gradual);
-
 	newSection.IsSteep = FMath::FRandRange(0.0f, actionSectionChanceTotal)
-		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep);
-
-
-	actionSectionChanceTotal = newSection.IsSteep ?
-		actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep_Up)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Steep_Down)
-		: actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Gradual_Up)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Sloped_Gradual_Down);
+		<= actionGrammarsReference->GetMovementValues().SteepChance;
 
 	newSection.IsUp = FMath::FRandRange(0.0f, actionSectionChanceTotal)
-		<= actionGrammarsReference->GetActionOccurenceChance(newSection.IsSteep ?
-			EPathSectionType::Sloped_Steep_Up
-			: EPathSectionType::Sloped_Gradual_Up);
+		<= actionGrammarsReference->GetMovementValues().UpChance;
 
 	// For now hardcoded -> Make variable in ActionGrammarsHolder
 	float movementAngle =
 		(newSection.IsSteep ?
-			30.0f
-			: 15.0f)
+			actionGrammarsReference->GetMovementValues().SteepAngleValue
+			: actionGrammarsReference->GetMovementValues().GradualAngleValue)
 		*
 		(newSection.IsUp ?
 			-1.0f
@@ -339,70 +327,78 @@ void UPathRealisation::AddMoveAction(float duration)
 void UPathRealisation::AddJumpAction()
 {
 	FPathSection newSection;
-	newSection.SectionType = EPathSectionType::Jump;
 	newSection.IsJump = true;
+	newSection.IsMove = false;
 
-	float actionSectionChanceTotal = actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap);
+	float actionSectionChanceTotal = 1.0f;
 
 	newSection.IsGap = FMath::FRandRange(0.0f, actionSectionChanceTotal)
-		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap);
+		<= actionGrammarsReference->GetJumpingValues().GapChance;
 
-	actionSectionChanceTotal =
-		newSection.IsGap ?
-		actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Up)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Forward)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Down)
-		: actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap_Up)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_NoGap_Down);
-
+	actionSectionChanceTotal = actionGrammarsReference->GetJumpingValues().UpJumpWeighting
+		+ actionGrammarsReference->GetJumpingValues().DownJumpWeighting
+		+ newSection.IsGap ? actionGrammarsReference->GetJumpingValues().ForwardJumpWeighting : 0.0f;
 
 	float actionSectionChanceCurrent = FMath::FRandRange(0.0f, actionSectionChanceTotal);
 
 	if (actionSectionChanceCurrent
-		<= actionGrammarsReference->GetActionOccurenceChance(
-			newSection.IsGap ?
-			EPathSectionType::Jump_Gap_Up
-			: EPathSectionType::Jump_NoGap_Up)) {
+		<= actionGrammarsReference->GetJumpingValues().UpJumpWeighting) {
 		newSection.VerticalDirection = 0;
 	}
 	else if (newSection.IsGap
 		&& actionSectionChanceCurrent
-		<= actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Up)
-		+ actionGrammarsReference->GetActionOccurenceChance(EPathSectionType::Jump_Gap_Forward)) {
+		<= actionGrammarsReference->GetJumpingValues().UpJumpWeighting
+		+ actionGrammarsReference->GetJumpingValues().ForwardJumpWeighting) {
 		newSection.VerticalDirection = 1;
 	}
 	else {
 		newSection.VerticalDirection = 2;
 	}
 
-	// Why is this section hardcoded?
-	// Because I didn't want a triple indented 3 split per indent if statement web that I couldn't understand
-	// PLEASE GET THE BIT FLAGS IMPLEMENTED
-	actionSectionChanceCurrent = FMath::FRandRange(0.0f, 6.0f);
+	actionSectionChanceTotal = 1.0f;
 
-	if (actionSectionChanceCurrent <= 3.0f) {
-		newSection.VerticalSize = 0;
-	}
-	else if (actionSectionChanceCurrent <= 5.0f) {
-		newSection.VerticalSize = 1;
+	newSection.IsLargeJump = FMath::FRandRange(0.0f, actionSectionChanceTotal)
+		<= actionGrammarsReference->GetJumpingValues().LargeJumpChance;
+
+	// Collectible type determination
+	if (!newSection.IsGap) {
+		newSection.collectiblePlacementType = ECollectiblePlacementType::UpStream;
 	}
 	else {
-		newSection.VerticalSize = 2;
+		switch (newSection.VerticalDirection)
+		{
+		case 0:
+			newSection.collectiblePlacementType = ECollectiblePlacementType::UpArc;
+			break;
+		case 1:
+			newSection.collectiblePlacementType = ECollectiblePlacementType::StraightArc;
+			break;
+		case 2:
+			newSection.collectiblePlacementType = ECollectiblePlacementType::DownArc;
+			break;
+		default:
+			break;
+		}
 	}
+
+
 
 	FVector distanceVector = FVector::ZeroVector;
 	distanceVector += newSection.IsGap ?
-		FVector(1.0f, 0.0f, 0.0f) * 400.0f
+		FVector(1.0f, 0.0f, 0.0f) * actionGrammarsReference->GetJumpingValues().GapDistance
 		:
 		FVector(1.0f, 0.0f, 0.0f) * 100.0f;
 
 	switch (newSection.VerticalDirection) {
 	case 0: // Up
-		distanceVector.Z += 210.0f/* / (1 + newSection.VerticalSize)*/;
+		distanceVector.Z += newSection.IsLargeJump ?
+			actionGrammarsReference->GetJumpingValues().UpLargeHeight
+			: actionGrammarsReference->GetJumpingValues().UpRegularHeight;
 		break;
 	case 2:
-		distanceVector.Z -= 400.0f /*/ (1 + newSection.VerticalSize)*/;
+		distanceVector.Z += newSection.IsLargeJump ?
+			actionGrammarsReference->GetJumpingValues().DownLargeHeight
+			: actionGrammarsReference->GetJumpingValues().DownRegularHeight;
 		break;
 	default:
 		break;

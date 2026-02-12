@@ -112,7 +112,7 @@ void UPCG_LevelCreator::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	if (PlayerCharacter)
 	{
 		if (PlayerCharacter->GetActorLocation().Z < lowestZPosition) {
-			PlayerCharacter->SetActorLocation(PlayerStart);
+			PlayerCharacter->SetActorLocation(PlayerStart + PlayerOffset);
 		}
 	}
 }

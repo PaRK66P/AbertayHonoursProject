@@ -29,6 +29,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
 	FVector PlayerStart;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
+	FVector PlayerOffset;
+
+
 
 	UFUNCTION()
 	void GenerateLevel(int NumberOfSections);
