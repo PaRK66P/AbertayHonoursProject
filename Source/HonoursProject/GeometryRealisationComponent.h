@@ -9,6 +9,7 @@
 
 struct FPathSection;
 class UActionGrammarsHolder;
+class UEvaluationPCGComponent;
 
 UENUM(BlueprintType)
 enum class ENodeType : uint8
@@ -47,7 +48,7 @@ public:
 	UPROPERTY()
 	FRotator rotation;
 	UPROPERTY()
-	AActor* platformRef;
+	AActor* platformRef = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -61,7 +62,7 @@ public:
 	UPROPERTY()
 	FRotator rotation;
 	UPROPERTY()
-	AActor* collectableRef;
+	AActor* collectableRef = nullptr;
 };
 
 
@@ -113,9 +114,9 @@ public:
 	{
 		if (X < 0 || X >= ChunkSize || Y < 0 || Y >= ChunkSize || Z < 0 || Z >= ChunkSize) {
 
-			UE_LOG(LogTemp, Error,
-				TEXT("Node out of range: %i, %i, %i"),
-				X, Y, Z);
+			//UE_LOG(LogTemp, Error,
+				//TEXT("Node out of range: %i, %i, %i"),
+				//X, Y, Z);
 			return ErrorNode;
 		}
 		return ChunkNodes[
@@ -164,6 +165,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
 	FVector NodeDimensions = FVector(100.0f, 100.0f, 100.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	FVector PlatformDimensions = FVector(380.0f, 800.0f, 80.0f);
 
 	UPROPERTY()
 	TArray<FChunkStruct> GeometryGrid;
@@ -218,5 +222,7 @@ public:
 	void ClearGrid();
 
 	void SpawnPlatformAtPosition(FVector Position);
+
+	void EvaluateGeometry(UEvaluationPCGComponent* evaluationComponent);
 		
 };

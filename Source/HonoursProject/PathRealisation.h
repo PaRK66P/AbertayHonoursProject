@@ -11,6 +11,7 @@ enum class EActionType : uint8;
 enum class ECollectiblePlacementType : uint8;
 struct FGeneratedBeatValues;
 class UActionGrammarsHolder;
+class UEvaluationPCGComponent;
 
 USTRUCT(BlueprintType)
 struct FActionEndValues
@@ -98,9 +99,13 @@ public:
 	UPathRealisation();
 
 	void SetActionGrammarReference(UActionGrammarsHolder* reference);
+	void SetDataGatheringReference(UEvaluationPCGComponent* reference);
+	void StopGatheringData();
 
 	TArray<FPathSection> CurrentPath;
 	UActionGrammarsHolder* actionGrammarsReference;
+	bool isEvaluating = false;
+	UEvaluationPCGComponent* evaluationComponent;
 
 protected:
 	// Called when the game starts

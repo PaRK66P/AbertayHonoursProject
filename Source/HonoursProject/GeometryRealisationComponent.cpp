@@ -5,6 +5,7 @@
 
 #include "PathRealisation.h"
 #include "ActionGrammarsHolder.h"
+#include "EvaluationPCGComponent.h"
 
 // Sets default values for this component's properties
 UGeometryRealisationComponent::UGeometryRealisationComponent()
@@ -69,14 +70,12 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 	generatedPlatform.rotation = FacingDirection.Rotation();
 	GeneratedPlatforms.Add(generatedPlatform);
 
-	UE_LOG(LogTemp, Log,
-		TEXT("Geometry Realising"));
+	//UE_LOG(LogTemp, Log,
+		//TEXT("Geometry Realising"));
 
 	for (FPathSection PathSection : Path) {
 		if (PathSection.IsMove)
 		{
-			UE_LOG(LogTemp, Log,
-				TEXT("Move"));
 			// ATTEMPT TURN DIRECTION
 			generatedPlatform.startPosition = currentPosition;
 
@@ -97,11 +96,11 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 			GeneratedPlatforms.Add(generatedPlatform);
 
 			// ADD PATH SECTION
-			DrawDebugLine(GetWorld(), generatedPlatform.startPosition, generatedPlatform.endPosition, FColor::Red, true, -1.0f, (uint8)0U, 10.0f);
+			//DrawDebugLine(GetWorld(), generatedPlatform.startPosition, generatedPlatform.endPosition, FColor::Red, true, -1.0f, (uint8)0U, 10.0f);
 		}
 		else if (PathSection.IsJump){
-			UE_LOG(LogTemp, Log,
-				TEXT("Jump"));
+			//UE_LOG(LogTemp, Log,
+				//TEXT("Jump"));
 			rotationAngle = GenerateTurnAngle();
 
 			FacingDirection = FacingDirection.GetSafeNormal().RotateAngleAxis(rotationAngle, FVector::UpVector);
@@ -112,59 +111,62 @@ FVector UGeometryRealisationComponent::AddPathToGrid(TArray<FPathSection> Path, 
 				0.0f) * PathSection.TravelVector.X
 				+ FVector(0.0f, 0.0f, PathSection.TravelVector.Z);
 
-			DrawDebugLine(GetWorld(), generatedPlatform.endPosition, currentPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
+			//DrawDebugLine(GetWorld(), generatedPlatform.endPosition, currentPosition, FColor::Green, true, -1.0f, (uint8)0U, 10.0f);
 			
 		}
 
 		int iterations;
 		float travelPercentage;
 		// Collectable generation
-		switch (PathSection.collectiblePlacementType)
-		{
-		case ECollectiblePlacementType::None:
-			break;
-		case ECollectiblePlacementType::AboveHorizontalPositions:
-			iterations = PathSection.TravelVector.X / ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance;
-			for (float i = 1; i <= iterations; i += 1.0f) {
-				travelPercentage = (i * ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance)
-					/ PathSection.TravelVector.X;
-				UE_LOG(LogTemp, Log,
-					TEXT("Percentage %f"), travelPercentage);
+		if (FMath::FRandRange(0.0f, 1.0f) <= ActionGrammarsRef->GetCollectableValues().CoinGenerationChance) {
+			switch (PathSection.collectiblePlacementType)
+			{
+			case ECollectiblePlacementType::None:
+				break;
+			case ECollectiblePlacementType::AboveHorizontalPositions:
+				iterations = PathSection.TravelVector.X / ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance;
+				for (float i = 1; i <= iterations; i += 1.0f) {
+					travelPercentage = (i * ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance)
+						/ PathSection.TravelVector.X;
+					//UE_LOG(LogTemp, Log,
+						//TEXT("Percentage %f"), travelPercentage);
 
-				generatedCollectable.position = generatedPlatform.startPosition +
-					FVector(
-						FacingDirection.X,
-						FacingDirection.Y,
-						0.0f)
-						* ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance 
+					generatedCollectable.position = generatedPlatform.startPosition +
+						FVector(
+							FacingDirection.X,
+							FacingDirection.Y,
+							0.0f)
+						* ActionGrammarsRef->GetCollectableValues().CoinSeperationDistance
 						* i
-					+ FVector(
-						0.0f,
-						0.0f,
-						FMath::Lerp(
-							generatedPlatform.startPosition.Z, 
-							generatedPlatform.endPosition.Z, 
-							travelPercentage)
+						+ FVector(
+							0.0f,
+							0.0f,
+							FMath::Lerp(
+								generatedPlatform.startPosition.Z,
+								generatedPlatform.endPosition.Z,
+								travelPercentage)
 							- generatedPlatform.startPosition.Z
 						);
-				GeneratedCollectables.Add(generatedCollectable);
+					GeneratedCollectables.Add(generatedCollectable);
+				}
+				break;
+			case ECollectiblePlacementType::UpStream:
+
+				break;
+			case ECollectiblePlacementType::UpArc:
+
+				break;
+			case ECollectiblePlacementType::StraightArc:
+
+				break;
+			case ECollectiblePlacementType::DownArc:
+
+				break;
+			default:
+				break;
 			}
-			break;
-		case ECollectiblePlacementType::UpStream:
-
-			break;
-		case ECollectiblePlacementType::UpArc:
-
-			break;
-		case ECollectiblePlacementType::StraightArc:
-
-			break;
-		case ECollectiblePlacementType::DownArc:
-
-			break;
-		default:
-			break;
 		}
+		
 
 		if (IncludeSafetyPlatforms) {
 			generatedPlatform.startPosition = currentPosition;
@@ -468,15 +470,14 @@ bool UGeometryRealisationComponent::IsStraightPathFree(FVector StartPosition, FV
 float UGeometryRealisationComponent::GenerateLevel()
 {
 	if (!StandardPlatform) {
-		UE_LOG(LogTemp, Warning, TEXT("No Base Platform"));
+		//UE_LOG(LogTemp, Warning, TEXT("No Base Platform"));
 		return 0.0f;
 	}
 	if (!StandardCollectable) {
-		UE_LOG(LogTemp, Warning, TEXT("No Collectable"));
+		//UE_LOG(LogTemp, Warning, TEXT("No Collectable"));
 		return 0.0f;
 	}
 
-	RemoveGeneratedLevel();
 	float defaultPlatformUnitWidth = ActionGrammarsRef->GetPlatformValues().RegularPlatformDefaultSize.Y;
 
 	float lowestPosition = 0.0f;
@@ -542,14 +543,32 @@ float UGeometryRealisationComponent::GenerateLevel()
 
 void UGeometryRealisationComponent::RemoveGeneratedLevel()
 {
-	/*for (FGenerationPlatform Platform : GeneratedPlatforms) {
-		if (!Platform.platformRef) {
-			continue;
+	for (int i = 0; i < GeneratedPlatforms.Num(); i++)
+	{
+		AActor* Platform = GeneratedPlatforms[i].platformRef;
+
+		if (IsValid(Platform))
+		{
+			Platform->Destroy();
 		}
-		Platform.platformRef->Destroy();
+
+		GeneratedPlatforms[i].platformRef = nullptr;
 	}
 
-	GeneratedPlatforms.Empty();*/
+	for (int i = 0; i < GeneratedCollectables.Num(); i++)
+	{
+		AActor* Collectable = GeneratedCollectables[i].collectableRef;
+
+		if (IsValid(Collectable))
+		{
+			Collectable->Destroy();
+		}
+
+		GeneratedCollectables[i].collectableRef = nullptr;
+	}
+
+	GeneratedPlatforms.Empty();
+	GeneratedCollectables.Empty();
 }
 
 void UGeometryRealisationComponent::ClearGrid()
@@ -573,6 +592,50 @@ void UGeometryRealisationComponent::SpawnPlatformAtPosition(FVector Position)
 	);
 
 	GeneratedPlatforms.Add(spawnedPlatform);*/
+}
+
+void UGeometryRealisationComponent::EvaluateGeometry(UEvaluationPCGComponent* evaluationComponent)
+{
+
+	FVector startPosition = GeneratedPlatforms[0].startPosition;
+	FVector endPosition = GeneratedPlatforms[GeneratedPlatforms.Num() - 1].endPosition;
+
+	FVector levelLinearLine = endPosition - startPosition;
+
+	for(FGenerationPlatform& platform : GeneratedPlatforms)
+	{
+		// Linearity
+		FVector platformMiddle = (platform.startPosition + platform.endPosition) / 2.0f;
+
+		FVector toPlatformVector = platformMiddle - startPosition;
+
+		FVector closestParallelLine = FVector::CrossProduct(toPlatformVector, levelLinearLine);
+
+		float distanceFromLinearLine = closestParallelLine.Size() / levelLinearLine.Size();
+
+
+		evaluationComponent->AddPlatformDistance(distanceFromLinearLine);
+
+		// Platform Density
+		float platformVolume =
+			(platform.endPosition - platform.startPosition).Size()
+			* PlatformDimensions.X * PlatformDimensions.Z;
+
+
+
+		evaluationComponent->AddObjectVolume(platformVolume);
+
+	}
+
+
+	float ChunkVolume = 
+		NodeDimensions.X * GeometryGrid[0].ChunkSize
+		* NodeDimensions.Y * GeometryGrid[0].ChunkSize
+		* NodeDimensions.Z * GeometryGrid[0].ChunkSize;
+
+
+	evaluationComponent->SetLevelVolume(GeometryGrid.Num() * ChunkVolume);
+
 }
 
 

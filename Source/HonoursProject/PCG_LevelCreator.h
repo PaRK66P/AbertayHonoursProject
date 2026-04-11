@@ -10,6 +10,7 @@ class UPathRealisation;
 class UGeometryRealisationComponent;
 class URhythmGenerationComponent;
 class UActionGrammarsHolder;
+class UEvaluationPCGComponent;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class HONOURSPROJECT_API UPCG_LevelCreator : public UActorComponent
@@ -24,7 +25,7 @@ public:
 	bool isDisplayed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
-	int LevelSections = 4;
+	int LevelSections = 5;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
 	FVector PlayerStart;
@@ -32,10 +33,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
 	FVector PlayerOffset;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
+	bool GenerateDataSet = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Generation")
+	int NumberOfDataSets;
+
 
 
 	UFUNCTION()
-	void GenerateLevel(int NumberOfSections);
+	void GenerateLevel(int NumberOfSections, float RhythmGroupDuration);
+
+	UFUNCTION()
+	void GenerateLevelData(int NumberOfLevels, int NumberOfSectionsInALevel, float RhythmGroupDuration);
 
 protected:
 	// Called when the game starts
@@ -49,6 +59,8 @@ protected:
 	URhythmGenerationComponent* RhythmGeneration;
 	UPROPERTY()
 	UActionGrammarsHolder* ActionGrammarsHolder;
+	UPROPERTY()
+	UEvaluationPCGComponent* EvaluationComponent;
 
 
 	float lowestZPosition = -100.0f;

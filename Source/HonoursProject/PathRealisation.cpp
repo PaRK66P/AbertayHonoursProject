@@ -10,6 +10,8 @@
 #include "RhythmGenerationComponent.h"
 #include "ActionGrammarsHolder.h"
 
+#include "EvaluationPCGComponent.h"
+
 // Sets default values for this component's properties
 UPathRealisation::UPathRealisation()
 {
@@ -23,6 +25,18 @@ UPathRealisation::UPathRealisation()
 void UPathRealisation::SetActionGrammarReference(UActionGrammarsHolder* reference)
 {
 	actionGrammarsReference = reference;
+}
+
+void UPathRealisation::SetDataGatheringReference(UEvaluationPCGComponent* reference)
+{
+	isEvaluating = true;
+	evaluationComponent = reference;
+}
+
+void UPathRealisation::StopGatheringData()
+{
+	isEvaluating = false;
+	evaluationComponent = nullptr;
 }
 
 
@@ -322,6 +336,10 @@ void UPathRealisation::AddMoveAction(float duration)
 		FVector::CrossProduct(FVector::UpVector, distanceVector).GetSafeNormal());
 
 	CurrentPath.Add(newSection);
+
+	if (isEvaluating) {
+		evaluationComponent->AddDifficulty(-1);
+	}
 }
 
 void UPathRealisation::AddJumpAction()
@@ -407,5 +425,27 @@ void UPathRealisation::AddJumpAction()
 	newSection.TravelVector = distanceVector;
 
 	CurrentPath.Add(newSection);
+
+	if (isEvaluating) {
+		float difficultyValue = 0.0f;
+		if (newSection.IsGap) { difficultyValue += 0.5; }
+
+		switch (newSection.VerticalDirection) {
+		case 0: // Up
+			difficultyValue += 0.2;
+			break;
+		case 1: // Forward
+			break;
+		case 2: // Down
+			difficultyValue += 0.1;
+			break;
+		}
+
+		if (newSection.IsLargeJump) {
+			difficultyValue += 0.2;
+		}
+
+		evaluationComponent->AddDifficulty(difficultyValue);
+	}
 }
 
