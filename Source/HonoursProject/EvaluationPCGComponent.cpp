@@ -121,7 +121,7 @@ void UEvaluationPCGComponent::OutputDataToFile()
 
 	FString filePath = FPaths::ProjectDir() + fileName;
 
-	FString dataString = "Linearity,Leniency,PlatformDensity,PatternVarience,PatternDensity\n";
+	FString dataString = "Linearity,Difficulty,PlatformDensity,PatternVarience,PatternDensity\n";
 
 	for (FEvaluationValues* dataValue : currentData)
 	{
@@ -129,7 +129,7 @@ void UEvaluationPCGComponent::OutputDataToFile()
 		{
 			dataString += FString::Printf(TEXT("%.4f,%.4f,%.4f,%.4f,%.4f\n"),
 				dataValue->Linearity,
-				dataValue->Leniency,
+				dataValue->Difficulty,
 				dataValue->PlatformDensity,
 				dataValue->PatternVarience,
 				dataValue->PatternDensity

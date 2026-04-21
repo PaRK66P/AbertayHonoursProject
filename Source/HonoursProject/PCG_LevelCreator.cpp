@@ -73,6 +73,8 @@ void UPCG_LevelCreator::GenerateLevel(int NumberOfSections, float RhythmGroupDur
 
 void UPCG_LevelCreator::GenerateLevelData(int NumberOfLevels, int NumberOfSectionsInALevel, float RhythmGroupDuration)
 {
+	double startTime = FPlatformTime::Seconds();
+
 	EvaluationComponent->StartDataGathering();
 	PathRealisation->SetDataGatheringReference(EvaluationComponent);
 
@@ -278,7 +280,11 @@ void UPCG_LevelCreator::GenerateLevelData(int NumberOfLevels, int NumberOfSectio
 
 		
 	}
-	
+
+	double endTime = FPlatformTime::Seconds();
+
+	UE_LOG(LogTemp, Warning, TEXT("Total test time: %f seconds"), endTime - startTime);
+	UE_LOG(LogTemp, Warning, TEXT("Average test time: %f seconds"), (endTime - startTime) / NumberOfLevels);
 
 	EvaluationComponent->OutputDataToFile();
 }
@@ -324,35 +330,6 @@ void UPCG_LevelCreator::BeginPlay()
 		GenerateLevelData(NumberOfDataSets, LevelSections, 20.0f);
 	}
 
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
-	GenerateLevel(LevelSections, 20.0f);
-	PlayerStart += FVector::UpVector * 100;
 	GenerateLevel(LevelSections, 20.0f);
 
 

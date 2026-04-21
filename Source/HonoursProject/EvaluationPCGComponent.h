@@ -58,7 +58,7 @@ public:
 	// Level length has been substituted where appropriate (e.g. number of platforms representing level length)
 	float Linearity; // Create a line of best fit, sum distance of each platform from line / Number of platforms
 
-	float Leniency; // Approximate difficulty, sum of all difficulty values / number of level objects (can be number of platforms)
+	float Difficulty; // Approximate difficulty, sum of all difficulty values / number of level objects (can be number of platforms)
 	// Difficulty can range from -1 to 1, -1 being safe, 1 being difficult
 
 	float PlatformDensity; // Platforms filling up the space, volume of objects / volume of the level
@@ -112,7 +112,7 @@ public:
 
 	void CalculateValues() {
 		Linearity = FMath::Min(totalPlatformDistance / (float)numberOfPlatforms, platformDistanceMaximum) / platformDistanceMaximum;
-		Leniency = ((totalDifficulty / (float)numberOfDifficultyObjects) + 1.0f) / 2.0f;
+		Difficulty = ((totalDifficulty / (float)numberOfDifficultyObjects) + 1.0f) / 2.0f;
 		PlatformDensity = totalObjectVolume / levelVolume;
 		PatternVarience = ((float)occuredVariencePatterns) / ((float)totalPossiblePatterns);
 		PatternDensity = ((float)highestRepeatingPatternAmount) / ((float)numberOfPatternObjects);
